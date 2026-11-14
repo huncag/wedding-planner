@@ -13,13 +13,15 @@ export function isPublicPath(pathname: string): boolean {
 }
 
 /**
- * Authentication is switched on when the flag and the Supabase keys are all
- * present. Keeping it explicit lets the app run without a backend during local
- * design work, while `/rsvp` and `/login` stay public in every case.
+ * Authentication is on by default whenever Supabase is configured.
+ *
+ * Set `NEXT_PUBLIC_AUTH_ENABLED=false` only to deliberately run the planner
+ * without a login (local design work). `/rsvp` and `/login` stay public in
+ * every case.
  */
 export function isAuthEnabled(): boolean {
   return (
-    process.env.NEXT_PUBLIC_AUTH_ENABLED === "true" &&
+    process.env.NEXT_PUBLIC_AUTH_ENABLED !== "false" &&
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
     Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)
   );

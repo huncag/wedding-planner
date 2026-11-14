@@ -31,10 +31,13 @@ Every other route requires a Supabase session.
 ## Authentication
 
 Two accounts are created manually in Supabase (**Authentication → Users**);
-there is no sign-up screen. `src/proxy.ts` refreshes the session, redirects
-signed-out visitors to `/login`, and keeps `/rsvp` open. The planner layout
-verifies the session again before rendering, and Supabase RLS is the real data
-boundary — the anon key alone can read nothing.
+there is no sign-up screen. Authentication turns on automatically whenever
+`NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are present;
+`NEXT_PUBLIC_AUTH_ENABLED=false` is only for local design work without a login.
+`src/proxy.ts` refreshes the session, redirects signed-out visitors to `/login`,
+and keeps `/rsvp` open. The planner layout verifies the session again before
+rendering, and Supabase RLS is the real data boundary — the anon key alone can
+read nothing.
 
 Sign out from the sidebar footer.
 
@@ -56,8 +59,8 @@ Full walkthrough: [`docs/supabase-setup.md`](docs/supabase-setup.md).
 1. Create a Supabase project in the Frankfurt region on the free plan.
 2. Create both accounts in **Authentication → Users** and turn off email
    confirmation.
-3. Copy `.env.example` to `.env.local` and add the project URL, anon key, and
-   `NEXT_PUBLIC_AUTH_ENABLED=true`.
+3. Copy `.env.example` to `.env.local` and add the project URL and anon key.
+   Authentication turns on automatically once both are present.
 4. Run [`supabase/schema.sql`](supabase/schema.sql) in the SQL editor.
 
 The schema creates `guests`, `vendors`, `budget`, `payments`, `invitations`,

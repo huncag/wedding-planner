@@ -36,9 +36,9 @@ In **Project Settings → API**, copy:
 - **anon / publishable key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 Create `.env.local` in the project root (it is git-ignored) using
-[`.env.example`](../.env.example) as the template, and leave
-`NEXT_PUBLIC_AUTH_ENABLED=true`. Never put the `service_role` key in a
-`NEXT_PUBLIC_` variable or in client code.
+[`.env.example`](../.env.example) as the template. The login gate turns on
+automatically once the URL and key are present. Never put the `service_role`
+key in a `NEXT_PUBLIC_` variable or in client code.
 
 ## 4. Create the tables
 

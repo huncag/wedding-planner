@@ -33,10 +33,11 @@ git push
    | ------------------------------- | ------------------------------------------ |
    | `NEXT_PUBLIC_SUPABASE_URL`      | `https://msjgyxsjaxecflezbolh.supabase.co`  |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | the publishable / anon key from Supabase    |
-   | `NEXT_PUBLIC_AUTH_ENABLED`      | `true`                                      |
 
    These are the same values as `.env.local`. The anon/publishable key is meant
-   to be public; never add the `service_role` key.
+   to be public; never add the `service_role` key. Authentication turns on
+   automatically once both values exist; `NEXT_PUBLIC_AUTH_ENABLED=false` is
+   only needed to disable the login gate for local design work.
 
 5. **Deploy**. The project URL is `https://wedding-planner-<team>.vercel.app`
    unless the project name is available as `wedding-planner.vercel.app`.
