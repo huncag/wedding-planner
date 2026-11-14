@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Teleki Castle wedding monogram">
-  <rect width="512" height="512" rx="96" fill="#1e3a32"/>
-  <rect x="40" y="40" width="432" height="432" rx="72" fill="none" stroke="#b08d57" stroke-width="6" opacity="0.75"/>
-  <g fill="#d9c6a4">
+  <rect width="512" height="512" rx="96" fill="#14364f"/>
+  <rect x="40" y="40" width="432" height="432" rx="72" fill="none" stroke="#7cbfe6" stroke-width="6" opacity="0.75"/>
+  <g fill="#bfe0f2">
     <rect x="150" y="250" width="52" height="118" rx="4"/>
     <rect x="310" y="250" width="52" height="118" rx="4"/>
     <rect x="216" y="196" width="80" height="172" rx="6"/>
@@ -14,5 +14,5 @@
     <rect x="346" y="232" width="16" height="24" rx="3"/>
     <rect x="128" y="368" width="256" height="14" rx="7"/>
   </g>
-  <path d="M240 368v-34a16 16 0 0 1 32 0v34Z" fill="#1e3a32"/>
+  <path d="M240 368v-34a16 16 0 0 1 32 0v34Z" fill="#14364f"/>
 </svg>

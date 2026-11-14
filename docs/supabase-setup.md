@@ -79,10 +79,12 @@ If you ever need to check it: **Database → Publications → supabase_realtime*
 - **Limits:** 500 MB database, 50,000 monthly active users, unlimited API
   requests — far beyond two planners and a wedding guest list.
 
-## What the app still needs
+## How the app uses these tables
 
-- The real RSVP form writing to `rsvp_submissions` (the public page is a
-  placeholder today).
-- Supabase query/mutation layers for guests, vendors, budget and seating so the
-  demo state is replaced by persisted rows.
-- Realtime subscriptions that refresh the planner when an RSVP arrives.
+- The public `/rsvp` page inserts into `rsvp_submissions`, and `/guests` streams
+  new replies live over Realtime.
+- `/budget` and `/seating` read and write their tables directly, so changes are
+  shared between both planners and survive a reload.
+- Attending replies are merged into `guests` the next time the overview or
+  seating page loads, so the guest list and seating plan stay in step.
+- `/vendors` is still a placeholder; the tables are ready for it.

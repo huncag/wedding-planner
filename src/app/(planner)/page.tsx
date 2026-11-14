@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import {
   BudgetIcon,
   CalendarIcon,
@@ -8,34 +9,17 @@ import {
   VendorsIcon,
 } from "@/components/icons";
 import { Countdown } from "@/components/countdown";
+import {
+  CURRENCY_COOKIE,
+  convertAmount,
+  formatMoney,
+  isCurrency,
+  type Currency,
+} from "@/lib/currency";
+import { getFxSnapshot } from "@/lib/fx";
+import { syncRsvpGuests } from "@/lib/guests-sync";
+import { createClient } from "@/lib/supabase/server";
 import { WEDDING } from "@/lib/wedding";
-
-const STATS = [
-  {
-    label: "Guests invited",
-    value: "0",
-    note: "Guest list is empty",
-    Icon: GuestsIcon,
-  },
-  {
-    label: "RSVPs confirmed",
-    value: "0",
-    note: "Awaiting replies",
-    Icon: CheckIcon,
-  },
-  {
-    label: "Vendors booked",
-    value: "0",
-    note: "No vendors yet",
-    Icon: VendorsIcon,
-  },
-  {
-    label: "Budget tracked",
-    value: "€0",
-    note: "Estimated vs. actual",
-    Icon: BudgetIcon,
-  },
-] as const;
 
 const NEXT_STEPS = [
   "Confirm the guest list",
@@ -44,7 +28,84 @@ const NEXT_STEPS = [
   "Design and send the invitations",
 ] as const;
 
-export default function OverviewPage() {
+export default async function OverviewPage() {
+  const supabase = await createClient();
+
+  await syncRsvpGuests(supabase);
+
+  const [cookieStore, fx, guestsResult, vendorsResult, budgetResult] =
+    await Promise.all([
+      cookies(),
+      getFxSnapshot(),
+      supabase.from("guests").select("rsvp_status"),
+      supabase.from("vendors").select("status"),
+      supabase.from("budget").select("estimated_cost, estimated_currency"),
+    ]);
+
+  const storedCurrency = cookieStore.get(CURRENCY_COOKIE)?.value;
+  const currency: Currency = isCurrency(storedCurrency) ? storedCurrency : "RON";
+
+  const guestStatuses = (guestsResult.data ?? []) as {
+    rsvp_status: "pending" | "attending" | "declined";
+  }[];
+  const invited = guestStatuses.length;
+  const attending = guestStatuses.filter(
+    (guest) => guest.rsvp_status === "attending",
+  ).length;
+  const declined = guestStatuses.filter(
+    (guest) => guest.rsvp_status === "declined",
+  ).length;
+
+  const vendorStatuses = (vendorsResult.data ?? []) as { status: string }[];
+  const vendorsBooked = vendorStatuses.filter(
+    (vendor) => vendor.status === "booked" || vendor.status === "completed",
+  ).length;
+
+  const budgetRows = (budgetResult.data ?? []) as {
+    estimated_cost: number | string;
+    estimated_currency: Currency;
+  }[];
+  const budgetTotal = budgetRows.reduce((total, row) => {
+    const amount = Number(row.estimated_cost);
+
+    return Number.isFinite(amount)
+      ? total +
+          convertAmount(amount, row.estimated_currency, currency, fx.rate)
+      : total;
+  }, 0);
+
+  const stats = [
+    {
+      label: "Guests invited",
+      value: String(invited),
+      note: invited === 0 ? "Guest list is empty" : `${declined} declined so far`,
+      Icon: GuestsIcon,
+    },
+    {
+      label: "RSVPs confirmed",
+      value: String(attending),
+      note:
+        invited === 0
+          ? "Awaiting replies"
+          : `${invited - attending - declined} still to reply`,
+      Icon: CheckIcon,
+    },
+    {
+      label: "Vendors booked",
+      value: String(vendorsBooked),
+      note: vendorsBooked === 0 ? "No vendors yet" : "Booked or completed",
+      Icon: VendorsIcon,
+    },
+    {
+      label: "Budget tracked",
+      value: formatMoney(budgetTotal, currency),
+      note: `${budgetRows.length} line ${
+        budgetRows.length === 1 ? "item" : "items"
+      } · estimated`,
+      Icon: BudgetIcon,
+    },
+  ] as const;
+
   return (
     <div className="space-y-8">
       <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -71,7 +132,7 @@ export default function OverviewPage() {
 
       <section aria-label="At a glance">
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {STATS.map(({ label, value, note, Icon }) => (
+          {stats.map(({ label, value, note, Icon }) => (
             <article
               key={label}
               className="rounded-2xl border border-parchment/80 bg-white/70 p-5 shadow-sm transition-colors hover:border-gold/50"
@@ -94,7 +155,8 @@ export default function OverviewPage() {
           ))}
         </div>
         <p className="mt-3 text-xs text-muted">
-          These numbers will populate once the Supabase tables are connected.
+          Live totals from your planner — RSVP replies, vendors and the budget
+          feed these cards.
         </p>
       </section>
 

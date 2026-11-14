@@ -17,11 +17,11 @@ Open [http://localhost:3000](http://localhost:3000). You will be redirected to `
 
 | Route      | Purpose                                            | Status       |
 | ---------- | -------------------------------------------------- | ------------ |
-| `/`        | Overview with countdown to 27 May 2028             | Built        |
+| `/`        | Overview with countdown and live planning totals   | Built        |
 | `/guests`  | Live RSVP inbox with meals, dietary needs, plus-ones | Built        |
 | `/vendors` | Suppliers, contacts, costs, booking status         | Placeholder  |
-| `/budget`  | Estimated vs. actual costs with RON/EUR conversion | Built (demo) |
-| `/seating` | Interactive seating map with drag-and-drop guests   | Built (demo) |
+| `/budget`  | Estimated vs. actual costs with RON/EUR conversion | Built        |
+| `/seating` | Interactive seating map with drag-and-drop guests   | Built        |
 | `/rsvp`    | Public RSVP form for guests                        | Built        |
 | `/login`   | Email + password sign-in                            | Built        |
 
@@ -81,6 +81,28 @@ polling fallback and a visible live/polling badge. New replies raise a toast;
 replies can be filtered, marked handled, or deleted. The page also has a
 copy-link button for sharing the public RSVP URL.
 
+Attending replies are merged into the `guests` table the next time the overview
+or seating page loads: the reply is matched by email or full name, linked back to
+that guest, and new people are added automatically. Re-submitting the form
+updates the same guest instead of creating a duplicate.
+
+## Budget and seating
+
+Both pages read and write Supabase directly, so the two of you always see the
+same plan.
+
+- **Budget** — each line item keeps the currency it was quoted in; totals convert
+  to the sidebar's display currency. Adding, deleting and toggling paid all save
+  immediately.
+- **Seating** — tables are stored in `seating_tables`; every guest's
+  `seating_table_id` and `seat_index` live on `guests`. Adding a table, resizing
+  it, seating, swapping and unseating are all persisted, and removing a table
+  first clears its guests' chairs.
+- **Overview** — the four cards are live counts of invited guests, attending
+  RSVPs, booked vendors and the estimated budget in the display currency.
+
+Both start empty; the Excel import can populate the tables later.
+
 ## Hosting
 
 **Vercel Hobby** (free) serves the app; **Supabase Free** holds the database.
@@ -113,9 +135,12 @@ src/
     seating/         # Interactive table cards + planner
   lib/
     auth.ts          # Public paths + auth feature flag
-    budget.ts        # Budget types, demo data, totals
+    budget.ts        # Budget types, row mapping and totals
     currency.ts      # Money types, conversion and formatting
     fx.ts            # ECB/Frankfurter rate fetching
+    guests-sync.ts   # Merges RSVP replies into the guest list
+    seating.ts       # Seating types and seat-assignment helpers
+    seating-db.ts    # Supabase row mapping for tables and chairs
     supabase/        # Browser + server clients
     wedding.ts       # Wedding date and venue config
   proxy.ts           # Session refresh + route protection
@@ -126,5 +151,6 @@ docs/                # Setup guides
 The wedding date lives in `src/lib/wedding.ts` — change `dateISO` there to move
 the countdown.
 
-The budget and seating pages currently use local demo state and reset on reload.
-Both are ready to be pointed at Supabase next.
+The palette lives in the `@theme` block of `src/app/globals.css`. Token names
+keep their historical labels (`forest`, `gold`, `cream`) so components stay
+stable; only the values need changing to repaint the whole app.

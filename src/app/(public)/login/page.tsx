@@ -18,7 +18,7 @@ export default function LoginPage() {
         <div className="absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gold/10 blur-3xl" />
       </div>
 
-      <article className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-parchment bg-ivory/95 shadow-[0_24px_80px_-32px_rgba(30,58,50,0.35)]">
+      <article className="relative w-full max-w-md overflow-hidden rounded-[2rem] border border-parchment bg-ivory/95 shadow-[0_24px_80px_-32px_rgba(20,54,79,0.28)]">
         <div className="h-1.5 w-full bg-gradient-to-r from-transparent via-gold/60 to-transparent" />
 
         <div className="px-6 py-9 sm:px-10 sm:py-11">

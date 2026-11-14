@@ -6,13 +6,14 @@ import { useCurrency } from "@/components/currency/currency-context";
 import { RateNote } from "@/components/currency/rate-note";
 import {
   BUDGET_CATEGORIES,
-  DEMO_BUDGET,
+  budgetItemFromRow,
   convertMoney,
   groupByCategory,
   isBudgetCategory,
   totalMoney,
   type BudgetCategoryId,
   type BudgetItem,
+  type BudgetRow,
 } from "@/lib/budget";
 import {
   CURRENCIES,
@@ -20,20 +21,13 @@ import {
   type Currency,
   type Money,
 } from "@/lib/currency";
+import { createClient } from "@/lib/supabase/client";
 
 const inputClass =
   "w-full rounded-xl border border-parchment bg-ivory px-3 py-2.5 text-sm text-forest placeholder:text-muted/70 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/25";
 
 const labelClass =
   "mb-1.5 block text-[0.6rem] font-medium uppercase tracking-[0.18em] text-muted";
-
-function newId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `budget-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
 function SummaryCard({
   label,
@@ -91,11 +85,18 @@ function MoneyCell({ money }: { money?: Money }) {
   );
 }
 
-export function BudgetPlanner() {
+export function BudgetPlanner({
+  initialItems,
+  initialError = null,
+}: {
+  initialItems: BudgetItem[];
+  initialError?: string | null;
+}) {
   const { currency, fx } = useCurrency();
-  const [items, setItems] = useState<BudgetItem[]>(() =>
-    DEMO_BUDGET.map((item) => ({ ...item })),
-  );
+  const [items, setItems] = useState<BudgetItem[]>(initialItems);
+  const [isAdding, setIsAdding] = useState(false);
+  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
+  const [saveError, setSaveError] = useState<string | null>(initialError);
 
   const [category, setCategory] = useState<BudgetCategoryId>("venue");
   const [label, setLabel] = useState("");
@@ -111,9 +112,22 @@ export function BudgetPlanner() {
   const groups = useMemo(() => groupByCategory(items), [items]);
   const paidCount = items.filter((item) => item.paid).length;
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const setPending = (id: string, pending: boolean) => {
+    setPendingIds((current) => {
+      const next = new Set(current);
+      if (pending) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(null);
+    setSaveError(null);
 
     const trimmedLabel = label.trim();
     const estimated = Number(estimatedInput.replace(",", "."));
@@ -136,40 +150,136 @@ export function BudgetPlanner() {
       return;
     }
 
-    setItems((current) => [
-      ...current,
-      {
-        id: newId(),
-        category,
-        label: trimmedLabel,
-        estimated: { amount: estimated, currency: entryCurrency },
-        ...(actual !== null
-          ? { actual: { amount: actual, currency: entryCurrency } }
-          : {}),
-        paid: false,
-      },
-    ]);
+    setIsAdding(true);
 
-    setLabel("");
-    setEstimatedInput("");
-    setActualInput("");
+    try {
+      const supabase = createClient();
+      const { data, error: insertError } = await supabase
+        .from("budget")
+        .insert({
+          category,
+          item: trimmedLabel,
+          estimated_cost: estimated,
+          estimated_currency: entryCurrency,
+          actual_cost: actual,
+          actual_currency: actual !== null ? entryCurrency : null,
+          paid: false,
+        })
+        .select("*")
+        .single();
+
+      if (insertError || !data) {
+        setSaveError(
+          insertError?.message
+            ? `Could not save the line item: ${insertError.message}`
+            : "Could not save the line item. Please try again.",
+        );
+        return;
+      }
+
+      setItems((current) => [...current, budgetItemFromRow(data as BudgetRow)]);
+      setLabel("");
+      setEstimatedInput("");
+      setActualInput("");
+    } catch {
+      setSaveError("Could not reach Supabase. Check the connection and retry.");
+    } finally {
+      setIsAdding(false);
+    }
   };
 
-  const togglePaid = (id: string) => {
+  const togglePaid = async (id: string) => {
+    const item = items.find((entry) => entry.id === id);
+    if (!item) {
+      return;
+    }
+
+    const paid = !item.paid;
+    setSaveError(null);
+    setPending(id, true);
     setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, paid: !item.paid } : item,
-      ),
+      current.map((entry) => (entry.id === id ? { ...entry, paid } : entry)),
     );
+
+    try {
+      const supabase = createClient();
+      const { error: updateError } = await supabase
+        .from("budget")
+        .update({ paid })
+        .eq("id", id);
+
+      if (updateError) {
+        setItems((current) =>
+          current.map((entry) =>
+            entry.id === id ? { ...entry, paid: item.paid } : entry,
+          ),
+        );
+        setSaveError(
+          `Could not update the payment status: ${updateError.message}`,
+        );
+      }
+    } catch {
+      setItems((current) =>
+        current.map((entry) =>
+          entry.id === id ? { ...entry, paid: item.paid } : entry,
+        ),
+      );
+      setSaveError("Could not reach Supabase. The change was not saved.");
+    } finally {
+      setPending(id, false);
+    }
   };
 
-  const removeItem = (id: string) => {
-    setItems((current) => current.filter((item) => item.id !== id));
+  const removeItem = async (id: string) => {
+    const index = items.findIndex((entry) => entry.id === id);
+    if (index === -1) {
+      return;
+    }
+
+    const removed = items[index];
+    setSaveError(null);
+    setPending(id, true);
+    setItems((current) => current.filter((entry) => entry.id !== id));
+
+    try {
+      const supabase = createClient();
+      const { error: deleteError } = await supabase
+        .from("budget")
+        .delete()
+        .eq("id", id);
+
+      if (deleteError) {
+        setItems((current) => {
+          const next = [...current];
+          next.splice(Math.min(index, next.length), 0, removed);
+          return next;
+        });
+        setSaveError(`Could not delete the line item: ${deleteError.message}`);
+      }
+    } catch {
+      setItems((current) => {
+        const next = [...current];
+        next.splice(Math.min(index, next.length), 0, removed);
+        return next;
+      });
+      setSaveError("Could not reach Supabase. The line item was not deleted.");
+    } finally {
+      setPending(id, false);
+    }
   };
 
   return (
     <div className="space-y-6">
       <RateNote />
+
+      {saveError ? (
+        <p
+          role="alert"
+          className="rounded-xl border border-gold/40 bg-gold/10 px-4 py-3 text-sm text-gold-ink"
+        >
+          {saveError}
+        </p>
+      ) : null}
 
       <section aria-label="Budget summary">
         <div className="grid gap-4 sm:grid-cols-3">
@@ -198,9 +308,8 @@ export function BudgetPlanner() {
           />
         </div>
         <p className="mt-3 text-xs text-muted">
-          Demo data — changes reset on reload until the Supabase tables are
-          connected. Amounts keep the currency you enter them in; totals convert
-          at the current rate.
+          Amounts keep the currency you enter them in; totals convert at the
+          current rate. Every change is saved to your shared planner.
         </p>
       </section>
 
@@ -314,10 +423,11 @@ export function BudgetPlanner() {
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-full bg-forest px-5 py-2.5 text-sm font-medium text-ivory transition-colors hover:bg-forest-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50"
+              disabled={isAdding}
+              className="inline-flex items-center gap-2 rounded-full bg-forest px-5 py-2.5 text-sm font-medium text-ivory transition-colors hover:bg-forest-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/50 disabled:cursor-wait disabled:opacity-60"
             >
               <PlusIcon className="h-4 w-4" />
-              Add item
+              {isAdding ? "Saving…" : "Add item"}
             </button>
             <p aria-live="polite" className="text-sm text-gold-ink">
               {error ?? ""}
@@ -328,7 +438,8 @@ export function BudgetPlanner() {
 
       {groups.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-parchment bg-cream/40 px-6 py-10 text-center text-sm text-muted">
-          Every line item has been removed. Add one above to start again.
+          No line items yet. Add the first cost above and it will be saved for
+          both of you.
         </p>
       ) : (
         <div className="space-y-5">
@@ -373,8 +484,9 @@ export function BudgetPlanner() {
                           type="button"
                           onClick={() => togglePaid(item.id)}
                           aria-pressed={item.paid}
+                          disabled={pendingIds.has(item.id)}
                           title="Toggle payment status"
-                          className={`rounded-full border px-2.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.12em] transition-colors ${
+                          className={`rounded-full border px-2.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.12em] transition-colors disabled:cursor-wait disabled:opacity-50 ${
                             item.paid
                               ? "border-forest/20 bg-forest/10 text-forest"
                               : "border-parchment bg-ivory text-muted hover:border-gold/50 hover:text-forest"
@@ -402,8 +514,9 @@ export function BudgetPlanner() {
                         <button
                           type="button"
                           onClick={() => removeItem(item.id)}
+                          disabled={pendingIds.has(item.id)}
                           aria-label={`Remove ${item.label}`}
-                          className="flex h-9 w-9 items-center justify-center rounded-full border border-parchment bg-ivory text-muted transition-colors hover:border-gold/60 hover:text-gold-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40"
+                          className="flex h-9 w-9 items-center justify-center rounded-full border border-parchment bg-ivory text-muted transition-colors hover:border-gold/60 hover:text-gold-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold/40 disabled:cursor-wait disabled:opacity-50"
                         >
                           <TrashIcon className="h-4 w-4" />
                         </button>

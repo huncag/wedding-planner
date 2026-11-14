@@ -26,48 +26,6 @@ export const MIN_SEATS = 1;
 export const MAX_SEATS = 14;
 export const DEFAULT_SEATS = 8;
 
-/**
- * Demo content only — the guest list is not wired to Supabase yet.
- * Everything here resets when the page reloads.
- */
-export const DEMO_GUESTS: Guest[] = [
-  { id: "anna-kovacs", name: "Anna Kovács", group: "Family", rsvp: "yes" },
-  { id: "mihai-popescu", name: "Mihai Popescu", group: "Family", rsvp: "yes" },
-  { id: "elena-popescu", name: "Elena Popescu", group: "Family", rsvp: "yes" },
-  { id: "laszlo-kovacs", name: "László Kovács", group: "Family", rsvp: "yes" },
-  { id: "eszter-nagy", name: "Eszter Nagy", group: "Family", rsvp: "yes" },
-  { id: "bence-nagy", name: "Bence Nagy", group: "Family", rsvp: "yes" },
-  { id: "sofia-ionescu", name: "Sofia Ionescu", group: "Friends", rsvp: "yes" },
-  { id: "andrei-dumitrescu", name: "Andrei Dumitrescu", group: "Friends", rsvp: "yes" },
-  { id: "ioana-munteanu", name: "Ioana Munteanu", group: "Friends", rsvp: "yes" },
-  { id: "radu-munteanu", name: "Radu Munteanu", group: "Friends", rsvp: "yes" },
-  { id: "clara-weber", name: "Clara Weber", group: "Friends", rsvp: "yes" },
-  { id: "jonas-weber", name: "Jonas Weber", group: "Friends", rsvp: "yes" },
-  { id: "maria-rossi", name: "Maria Rossi", group: "Friends", rsvp: "pending" },
-  { id: "david-chen", name: "David Chen", group: "Friends", rsvp: "no" },
-];
-
-export const DEMO_TABLES: SeatingTable[] = [
-  {
-    id: "table-1",
-    number: 1,
-    seats: 6,
-    guests: ["anna-kovacs", "mihai-popescu", null, null, null, null],
-  },
-  {
-    id: "table-2",
-    number: 2,
-    seats: 6,
-    guests: ["sofia-ionescu", null, null, null, null, null],
-  },
-  {
-    id: "table-3",
-    number: 3,
-    seats: 6,
-    guests: [null, null, null, null, null, null],
-  },
-];
-
 export function findGuestSeat(
   tables: SeatingTable[],
   guestId: string,
