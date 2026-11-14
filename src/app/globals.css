@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ivory: #fbf8f3;
+  --color-cream: #f4ecdf;
+  --color-parchment: #e7dbc6;
+  --color-forest: #1e3a32;
+  --color-forest-700: #27493f;
+  --color-forest-600: #33584c;
+  --color-gold: #b08d57;
+  --color-gold-ink: #856337;
+  --color-gold-light: #d9c6a4;
+  --color-ink: #26251f;
+  --color-muted: #6b675a;
+
+  --font-sans: var(--font-geist-sans);
+  --font-display: var(--font-cormorant);
+}
+
+@keyframes table-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-table-in {
+  animation: table-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-table-in {
+    animation: none;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background-color: var(--color-ivory);
+    color: var(--color-ink);
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  }
+
+  ::selection {
+    background-color: var(--color-gold-light);
+    color: var(--color-forest);
+  }
+}
