@@ -15,6 +15,7 @@ export type RsvpSubmission = {
   email: string | null;
   phone: string | null;
   attending: boolean;
+  party_size: number | null;
   meal_preference: MealPreference | null;
   dietary_restrictions: string | null;
   plus_one_name: string | null;
@@ -52,6 +53,7 @@ export function formatSubmittedAt(iso: string): string {
 export type RsvpSummary = {
   replies: number;
   attending: number;
+  people: number;
   declined: number;
   plusOnes: number;
   dietaryNotes: number;
@@ -66,6 +68,7 @@ export function summarizeRsvps(
 
       if (submission.attending) {
         summary.attending += 1;
+        summary.people += Math.max(1, submission.party_size ?? 1);
 
         if (submission.plus_one_name?.trim()) {
           summary.plusOnes += 1;
@@ -80,6 +83,13 @@ export function summarizeRsvps(
 
       return summary;
     },
-    { replies: 0, attending: 0, declined: 0, plusOnes: 0, dietaryNotes: 0 },
+    {
+      replies: 0,
+      attending: 0,
+      people: 0,
+      declined: 0,
+      plusOnes: 0,
+      dietaryNotes: 0,
+    },
   );
 }

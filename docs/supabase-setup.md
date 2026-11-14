@@ -61,14 +61,30 @@ It creates:
 It also enables RLS on every table, gives the authenticated accounts full
 access, and allows **insert-only** anonymous access to `rsvp_submissions`.
 
-## 5. Realtime
+## 5. Import the wedding spreadsheet
+
+After `schema.sql`, open **SQL Editor → New query** again and run
+[`supabase/import-plan.sql`](../supabase/import-plan.sql).
+
+It adds the party, invitation, vendor and deposit columns and then imports the
+couple's existing plan:
+
+- 154 invitation groups / 309 people, with side and category
+- 20 tables × 10 chairs
+- 19 vendors with offers, price notes and agreed flags
+- 3 deposit budget lines with payment method and reference
+
+Every insert checks that its table is empty first, so running the file twice is
+safe. The original workbook is never modified.
+
+## 6. Realtime
 
 The script adds `rsvp_submissions` and `guests` to the `supabase_realtime`
 publication. That is what makes the planner update live when a guest replies.
 
 If you ever need to check it: **Database → Publications → supabase_realtime**.
 
-## 6. Free-tier housekeeping
+## 7. Free-tier housekeeping
 
 - **Pausing:** free projects pause after 7 days without activity. Opening the
   planner or receiving an RSVP resets the timer. A paused project is resumed
@@ -83,8 +99,9 @@ If you ever need to check it: **Database → Publications → supabase_realtime*
 
 - The public `/rsvp` page inserts into `rsvp_submissions`, and `/guests` streams
   new replies live over Realtime.
-- `/budget` and `/seating` read and write their tables directly, so changes are
-  shared between both planners and survive a reload.
-- Attending replies are merged into `guests` the next time the overview or
-  seating page loads, so the guest list and seating plan stay in step.
-- `/vendors` is still a placeholder; the tables are ready for it.
+- `/guests` stores one row per invitation group, with headcount, side, category
+  and invitation tracking.
+- `/budget`, `/vendors` and `/seating` read and write their tables directly, so
+  changes are shared between both planners and survive a reload.
+- Attending replies are merged into `guests` the next time the overview, guests
+  or seating page loads, so the guest list and seating plan stay in step.

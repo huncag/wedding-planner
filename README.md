@@ -18,10 +18,10 @@ Open [http://localhost:3000](http://localhost:3000). You will be redirected to `
 | Route      | Purpose                                            | Status       |
 | ---------- | -------------------------------------------------- | ------------ |
 | `/`        | Overview with countdown and live planning totals   | Built        |
-| `/guests`  | Live RSVP inbox with meals, dietary needs, plus-ones | Built        |
-| `/vendors` | Suppliers, contacts, costs, booking status         | Placeholder  |
-| `/budget`  | Estimated vs. actual costs with RON/EUR conversion | Built        |
-| `/seating` | Interactive seating map with drag-and-drop guests   | Built        |
+| `/guests`  | Party-based guest list, invitation tracking and RSVP inbox | Built |
+| `/vendors` | Suppliers grouped by category, offers, prices and agreements | Built |
+| `/budget`  | Deposits and costs with RON/EUR conversion         | Built        |
+| `/seating` | Party-aware seating map with drag-and-drop groups  | Built        |
 | `/rsvp`    | Public RSVP form for guests                        | Built        |
 | `/login`   | Email + password sign-in                            | Built        |
 
@@ -68,23 +68,40 @@ The schema creates `guests`, `vendors`, `budget`, `payments`, `invitations`,
 table. Authenticated users get full access; anonymous visitors may only insert
 an RSVP. Nothing is readable without an account.
 
+## Importing the spreadsheet
+
+The couple's existing plan (`A TÁBLÁZAT - E&H.xlsx`) is imported with
+[`supabase/import-plan.sql`](supabase/import-plan.sql). It adds the party,
+invitation, vendor and deposit columns, then inserts:
+
+- 154 invitation groups / 309 people, with side and category
+- 20 tables × 10 chairs
+- 19 vendors with their offers, price notes and agreed flags
+- 3 deposit budget lines with payment method and reference
+
+Every insert is guarded by an empty-table check, so the file is safe to run
+twice. The workbook itself is never modified. Paste the file into the Supabase
+SQL editor and run it once after `schema.sql`.
+
 ## Public RSVP and live updates
 
 Guests open `/rsvp` without an account and submit their reply directly into
-`rsvp_submissions`. The form asks for contact details, attendance, meal, dietary
-needs, a plus-one and a message; anonymous visitors can only insert a reply and
-can never read anyone else's.
+`rsvp_submissions`. The form asks for contact details, attendance, party size,
+meal, dietary needs, a plus-one and a message; anonymous visitors can only insert
+a reply and can never read anyone else's.
 
-`/guests` is the couple's inbox. It loads the replies on the server, then keeps
-them current through Supabase Realtime on `rsvp_submissions`, with a 20-second
-polling fallback and a visible live/polling badge. New replies raise a toast;
-replies can be filtered, marked handled, or deleted. The page also has a
+`/guests` is the couple's guest list and inbox. The list stores one row per
+invitation group — headcount, side, category, invitation sent/reminder, reply and
+confirmed headcount — grouped by side and category. Below it, replies load on the
+server and stay current through Supabase Realtime on `rsvp_submissions`, with a
+20-second polling fallback and a visible live/polling badge. New replies raise a
+toast; replies can be filtered, marked handled, or deleted. The page also has a
 copy-link button for sharing the public RSVP URL.
 
-Attending replies are merged into the `guests` table the next time the overview
-or seating page loads: the reply is matched by email or full name, linked back to
-that guest, and new people are added automatically. Re-submitting the form
-updates the same guest instead of creating a duplicate.
+Attending replies are merged into the `guests` table the next time the overview,
+guests or seating page loads: the reply is matched by email or full name, linked
+back to that party, and new parties are added automatically. The submitted party
+size updates the confirmed headcount without shrinking an imported group.
 
 ## Budget and seating
 
@@ -92,16 +109,19 @@ Both pages read and write Supabase directly, so the two of you always see the
 same plan.
 
 - **Budget** — each line item keeps the currency it was quoted in; totals convert
-  to the sidebar's display currency. Adding, deleting and toggling paid all save
-  immediately.
-- **Seating** — tables are stored in `seating_tables`; every guest's
-  `seating_table_id` and `seat_index` live on `guests`. Adding a table, resizing
-  it, seating, swapping and unseating are all persisted, and removing a table
-  first clears its guests' chairs.
-- **Overview** — the four cards are live counts of invited guests, attending
-  RSVPs, booked vendors and the estimated budget in the display currency.
-
-Both start empty; the Excel import can populate the tables later.
+  to the sidebar's display currency. Vendor, payment method, payment reference
+  and notes are kept with each deposit, and adding, deleting and toggling paid
+  all save immediately.
+- **Seating** — tables are stored in `seating_tables`; a party's starting chair
+  lives on `guests.seat_index` and it occupies `party_size` consecutive chairs.
+  Adding a table, resizing it, seating a whole group, moving groups and
+  unseating are all persisted, and removing a table first clears its guests'
+  chairs. Pending groups are shown so the room can be planned before replies
+  arrive.
+- **Vendors** — grouped by category, with contact, handled-by, offer summary,
+  free-text price note, agreement and status, all saved as you toggle.
+- **Overview** — the four cards are live totals of people invited, people coming,
+  booked vendors and the estimated budget in the display currency.
 
 ## Hosting
 
@@ -130,21 +150,25 @@ src/
     auth/            # Login form
     budget/          # Budget summary, line-item form, totals
     currency/        # Currency context, toggle, rate note, Money
-    guests/          # Live RSVP inbox
+    guests/          # Guest list, invitation tracking and live RSVP inbox
     rsvp/            # Public RSVP form
-    seating/         # Interactive table cards + planner
+    seating/         # Interactive table cards + party-aware planner
+    vendors/         # Supplier board and edit form
   lib/
     auth.ts          # Public paths + auth feature flag
     budget.ts        # Budget types, row mapping and totals
     currency.ts      # Money types, conversion and formatting
     fx.ts            # ECB/Frankfurter rate fetching
     guests-sync.ts   # Merges RSVP replies into the guest list
-    seating.ts       # Seating types and seat-assignment helpers
+    guests.ts        # Party types, invitation fields, filters and stats
+    vendors.ts       # Vendor types, grouping, statuses and stats
+    seating.ts       # Seating types and party placement helpers
     seating-db.ts    # Supabase row mapping for tables and chairs
     supabase/        # Browser + server clients
     wedding.ts       # Wedding date and venue config
   proxy.ts           # Session refresh + route protection
 supabase/schema.sql  # Database schema, RLS and Realtime setup
+supabase/import-plan.sql # One-time spreadsheet import
 docs/                # Setup guides
 ```
 

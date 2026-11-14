@@ -37,28 +37,53 @@ export default async function OverviewPage() {
     await Promise.all([
       cookies(),
       getFxSnapshot(),
-      supabase.from("guests").select("rsvp_status"),
-      supabase.from("vendors").select("status"),
+      supabase.from("guests").select("*"),
+      supabase.from("vendors").select("*"),
       supabase.from("budget").select("estimated_cost, estimated_currency"),
     ]);
 
   const storedCurrency = cookieStore.get(CURRENCY_COOKIE)?.value;
   const currency: Currency = isCurrency(storedCurrency) ? storedCurrency : "RON";
 
-  const guestStatuses = (guestsResult.data ?? []) as {
+  const guestRows = (guestsResult.data ?? []) as {
     rsvp_status: "pending" | "attending" | "declined";
+    party_size: number | string | null;
+    confirmed_count: number | string | null;
   }[];
-  const invited = guestStatuses.length;
-  const attending = guestStatuses.filter(
-    (guest) => guest.rsvp_status === "attending",
+  const parties = guestRows.length;
+  const invitedPeople = guestRows.reduce((total, guest) => {
+    const size = Number(guest.party_size ?? 1);
+
+    return total + (Number.isFinite(size) && size > 0 ? Math.round(size) : 1);
+  }, 0);
+  const attendingPeople = guestRows.reduce((total, guest) => {
+    if (guest.rsvp_status !== "attending") {
+      return total;
+    }
+
+    const size = Number(guest.party_size ?? 1);
+    const confirmed = Number(guest.confirmed_count ?? size);
+
+    return total + (Number.isFinite(confirmed) && confirmed > 0
+      ? Math.round(confirmed)
+      : 0);
+  }, 0);
+  const pendingParties = guestRows.filter(
+    (guest) => guest.rsvp_status === "pending",
   ).length;
-  const declined = guestStatuses.filter(
+  const declinedParties = guestRows.filter(
     (guest) => guest.rsvp_status === "declined",
   ).length;
 
-  const vendorStatuses = (vendorsResult.data ?? []) as { status: string }[];
+  const vendorStatuses = (vendorsResult.data ?? []) as {
+    status: string;
+    agreed: boolean | null;
+  }[];
   const vendorsBooked = vendorStatuses.filter(
     (vendor) => vendor.status === "booked" || vendor.status === "completed",
+  ).length;
+  const vendorsAgreed = vendorStatuses.filter(
+    (vendor) => vendor.agreed,
   ).length;
 
   const budgetRows = (budgetResult.data ?? []) as {
@@ -77,23 +102,29 @@ export default async function OverviewPage() {
   const stats = [
     {
       label: "Guests invited",
-      value: String(invited),
-      note: invited === 0 ? "Guest list is empty" : `${declined} declined so far`,
+      value: String(invitedPeople),
+      note:
+        parties === 0
+          ? "Guest list is empty"
+          : `${parties} invitation groups · ${declinedParties} declined`,
       Icon: GuestsIcon,
     },
     {
-      label: "RSVPs confirmed",
-      value: String(attending),
+      label: "Coming",
+      value: String(attendingPeople),
       note:
-        invited === 0
+        parties === 0
           ? "Awaiting replies"
-          : `${invited - attending - declined} still to reply`,
+          : `${pendingParties} groups still to reply`,
       Icon: CheckIcon,
     },
     {
       label: "Vendors booked",
-      value: String(vendorsBooked),
-      note: vendorsBooked === 0 ? "No vendors yet" : "Booked or completed",
+      value: `${vendorsBooked} / ${vendorStatuses.length}`,
+      note:
+        vendorStatuses.length === 0
+          ? "No vendors yet"
+          : `${vendorsAgreed} agreed`,
       Icon: VendorsIcon,
     },
     {

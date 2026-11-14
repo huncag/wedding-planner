@@ -102,6 +102,10 @@ export function BudgetPlanner({
   const [label, setLabel] = useState("");
   const [estimatedInput, setEstimatedInput] = useState("");
   const [actualInput, setActualInput] = useState("");
+  const [vendorName, setVendorName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [notes, setNotes] = useState("");
   const [entryCurrency, setEntryCurrency] = useState<Currency>("RON");
   const [error, setError] = useState<string | null>(null);
 
@@ -164,6 +168,10 @@ export function BudgetPlanner({
           actual_cost: actual,
           actual_currency: actual !== null ? entryCurrency : null,
           paid: false,
+          vendor_name: vendorName.trim() || null,
+          payment_method: paymentMethod.trim() || null,
+          payment_reference: paymentReference.trim() || null,
+          notes: notes.trim() || null,
         })
         .select("*")
         .single();
@@ -181,6 +189,10 @@ export function BudgetPlanner({
       setLabel("");
       setEstimatedInput("");
       setActualInput("");
+      setVendorName("");
+      setPaymentMethod("");
+      setPaymentReference("");
+      setNotes("");
     } catch {
       setSaveError("Could not reach Supabase. Check the connection and retry.");
     } finally {
@@ -420,6 +432,61 @@ export function BudgetPlanner({
             </div>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label htmlFor="budget-vendor" className={labelClass}>
+                Vendor or payee
+              </label>
+              <input
+                id="budget-vendor"
+                type="text"
+                value={vendorName}
+                onChange={(event) => setVendorName(event.target.value)}
+                placeholder="e.g. Diavolo"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="budget-method" className={labelClass}>
+                Payment method
+              </label>
+              <input
+                id="budget-method"
+                type="text"
+                value={paymentMethod}
+                onChange={(event) => setPaymentMethod(event.target.value)}
+                placeholder="e.g. Utalás"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label htmlFor="budget-reference" className={labelClass}>
+                Payment reference
+              </label>
+              <input
+                id="budget-reference"
+                type="text"
+                value={paymentReference}
+                onChange={(event) => setPaymentReference(event.target.value)}
+                placeholder="Invoice or transfer note"
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="budget-notes" className={labelClass}>
+              Notes
+            </label>
+            <textarea
+              id="budget-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Deposit terms, what is still due, anything to remember"
+              className={`${inputClass} min-h-[3.5rem] resize-y`}
+            />
+          </div>
+
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="submit"
@@ -476,24 +543,61 @@ export function BudgetPlanner({
                       key={item.id}
                       className="grid gap-3 px-5 py-4 sm:grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_auto] sm:items-start"
                     >
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-forest">
-                          {item.label}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => togglePaid(item.id)}
-                          aria-pressed={item.paid}
-                          disabled={pendingIds.has(item.id)}
-                          title="Toggle payment status"
-                          className={`rounded-full border px-2.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.12em] transition-colors disabled:cursor-wait disabled:opacity-50 ${
-                            item.paid
-                              ? "border-forest/20 bg-forest/10 text-forest"
-                              : "border-parchment bg-ivory text-muted hover:border-gold/50 hover:text-forest"
-                          }`}
-                        >
-                          {item.paid ? "Paid" : "Due"}
-                        </button>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-forest">
+                            {item.label}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePaid(item.id)}
+                            aria-pressed={item.paid}
+                            disabled={pendingIds.has(item.id)}
+                            title="Toggle payment status"
+                            className={`rounded-full border px-2.5 py-0.5 text-[0.6rem] font-medium uppercase tracking-[0.12em] transition-colors disabled:cursor-wait disabled:opacity-50 ${
+                              item.paid
+                                ? "border-forest/20 bg-forest/10 text-forest"
+                                : "border-parchment bg-ivory text-muted hover:border-gold/50 hover:text-forest"
+                            }`}
+                          >
+                            {item.paid ? "Paid" : "Due"}
+                          </button>
+                        </div>
+
+                        {item.vendorName ||
+                        item.notes ||
+                        item.paymentMethod ||
+                        item.paymentReference ||
+                        (item.quantity !== null &&
+                          item.quantity !== undefined &&
+                          item.unitPrice !== null &&
+                          item.unitPrice !== undefined) ? (
+                          <div className="mt-1 space-y-0.5 text-[0.7rem] leading-relaxed text-muted">
+                            {item.vendorName ? (
+                              <p>Vendor · {item.vendorName}</p>
+                            ) : null}
+                            {item.quantity !== null &&
+                            item.quantity !== undefined &&
+                            item.unitPrice !== null &&
+                            item.unitPrice !== undefined ? (
+                              <p>
+                                {item.quantity} ×{" "}
+                                {formatMoney(
+                                  item.unitPrice,
+                                  item.estimated.currency,
+                                )}
+                              </p>
+                            ) : null}
+                            {item.notes ? <p>{item.notes}</p> : null}
+                            {item.paymentMethod || item.paymentReference ? (
+                              <p>
+                                {[item.paymentMethod, item.paymentReference]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="sm:text-right">

@@ -3,15 +3,21 @@ export type RsvpStatus = "yes" | "pending" | "no";
 export type Guest = {
   id: string;
   name: string;
+  /** Invitation group label shown in the sidebar, e.g. "Eszter · Family". */
   group: string;
   rsvp: RsvpStatus;
+  /** Number of people in this invitation group. */
+  partySize: number;
 };
 
 export type SeatingTable = {
   id: string;
   number: number;
   seats: number;
-  /** Guest id per seat, left to right. `null` marks a free chair. */
+  /**
+   * Guest id per chair, left to right. A party repeats across consecutive
+   * chairs; `null` marks a free chair.
+   */
   guests: Array<string | null>;
 };
 
@@ -24,76 +30,139 @@ export const GUEST_DRAG_TYPE = "application/x-wedding-guest";
 
 export const MIN_SEATS = 1;
 export const MAX_SEATS = 14;
-export const DEFAULT_SEATS = 8;
+export const DEFAULT_SEATS = 10;
 
+export function partySizeOf(guest: Guest | undefined): number {
+  return Math.max(1, guest?.partySize ?? 1);
+}
+
+/** First chair of a party, or null when the party is not seated. */
 export function findGuestSeat(
   tables: SeatingTable[],
   guestId: string,
 ): SeatLocation | null {
   for (const table of tables) {
-    for (let index = 0; index < table.seats; index += 1) {
-      if (table.guests[index] === guestId) {
-        return { tableId: table.id, seatIndex: index };
-      }
+    const index = table.guests
+      .slice(0, table.seats)
+      .findIndex((id) => id === guestId);
+
+    if (index !== -1) {
+      return { tableId: table.id, seatIndex: index };
     }
   }
 
   return null;
 }
 
+/** Every chair a party currently occupies, wrapping around the table. */
+export function guestChairIndices(table: SeatingTable, guestId: string): number[] {
+  const indices: number[] = [];
+
+  for (let index = 0; index < table.seats; index += 1) {
+    if (table.guests[index] === guestId) {
+      indices.push(index);
+    }
+  }
+
+  return indices;
+}
+
+function fitsAt(
+  table: SeatingTable,
+  start: number,
+  size: number,
+  guestId?: string,
+): boolean {
+  if (size < 1 || size > table.seats) {
+    return false;
+  }
+
+  for (let offset = 0; offset < size; offset += 1) {
+    const index = (start + offset) % table.seats;
+    const occupant = table.guests[index] ?? null;
+
+    if (occupant !== null && occupant !== guestId) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /**
- * Seats a guest. If the target chair is taken, the two guests swap seats
- * (or the previous guest's chair is reused). The guest is removed from any
- * chair they occupied before, so a guest can never sit at two tables.
+ * Finds the first run of `size` free chairs, scanning forward from `preferred`
+ * and wrapping around the table. Returns null when the party does not fit.
  */
-export function assignGuest(
+export function findPartyStart(
+  table: SeatingTable,
+  size: number,
+  preferred = 0,
+  guestId?: string,
+): number | null {
+  if (size > table.seats) {
+    return null;
+  }
+
+  for (let offset = 0; offset < table.seats; offset += 1) {
+    const start = (preferred + offset) % table.seats;
+
+    if (fitsAt(table, start, size, guestId)) {
+      return start;
+    }
+  }
+
+  return null;
+}
+
+export type PlacePartyResult = {
+  tables: SeatingTable[];
+  placed: boolean;
+};
+
+/**
+ * Seats a whole party on consecutive chairs. The party is removed from its
+ * previous table first. If there is no free run large enough, the plan is left
+ * untouched and `placed` is false so the caller can explain why.
+ */
+export function placeParty(
   tables: SeatingTable[],
   guestId: string,
   tableId: string,
   seatIndex: number,
-): SeatingTable[] {
+  partySize: number,
+): PlacePartyResult {
   const target = tables.find((table) => table.id === tableId);
 
-  if (!target || seatIndex < 0 || seatIndex >= target.seats) {
-    return tables;
+  if (!target) {
+    return { tables, placed: false };
   }
 
-  const current = findGuestSeat(tables, guestId);
-
-  if (
-    current &&
-    current.tableId === tableId &&
-    current.seatIndex === seatIndex
-  ) {
-    return tables;
-  }
-
-  const next = tables.map((table) => ({
+  const size = Math.max(1, Math.round(partySize));
+  const cleared = tables.map((table) => ({
     ...table,
-    guests: [...table.guests],
+    guests: table.guests.map((id) => (id === guestId ? null : id)),
   }));
-  const nextTarget = next.find((table) => table.id === tableId);
-  const currentTable = current
-    ? next.find((table) => table.id === current.tableId)
-    : undefined;
+  const nextTarget = cleared.find((table) => table.id === tableId);
 
   if (!nextTarget) {
-    return tables;
+    return { tables, placed: false };
   }
 
-  const occupant = nextTarget.guests[seatIndex] ?? null;
+  const start = findPartyStart(
+    nextTarget,
+    size,
+    Math.min(Math.max(0, seatIndex), nextTarget.seats - 1),
+  );
 
-  if (current && currentTable) {
-    currentTable.guests[current.seatIndex] = null;
+  if (start === null) {
+    return { tables, placed: false };
   }
 
-  nextTarget.guests[seatIndex] = guestId;
-
-  if (occupant && occupant !== guestId && current && currentTable) {
-    currentTable.guests[current.seatIndex] = occupant;
+  for (let offset = 0; offset < size; offset += 1) {
+    nextTarget.guests[(start + offset) % nextTarget.seats] = guestId;
   }
 
-  return next;
+  return { tables: cleared, placed: true };
 }
 
 export function unassignGuest(
@@ -110,6 +179,7 @@ export function unassignGuest(
   }));
 }
 
+/** Occupied chairs, which equals the number of people seated. */
 export function countSeated(tables: SeatingTable[]): number {
   return tables.reduce(
     (total, table) =>
@@ -123,13 +193,10 @@ export function totalCapacity(tables: SeatingTable[]): number {
 }
 
 export function nextTableNumber(tables: SeatingTable[]): number {
-  return tables.reduce((highest, table) => Math.max(highest, table.number), 0) + 1;
-}
-
-export function firstEmptySeat(table: SeatingTable): number | null {
-  const index = table.guests.slice(0, table.seats).findIndex((id) => id === null);
-
-  return index === -1 ? null : index;
+  return tables.reduce(
+    (highest, table) => Math.max(highest, table.number),
+    0,
+  ) + 1;
 }
 
 /** Whether a drag currently in flight carries one of our guests. */

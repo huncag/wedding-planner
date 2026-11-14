@@ -5,9 +5,10 @@ import { MinusIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import {
   MAX_SEATS,
   MIN_SEATS,
-  firstEmptySeat,
+  findPartyStart,
   guestChairLabel,
   isGuestDrag,
+  partySizeOf,
   readDraggedGuest,
   type Guest,
   type SeatingTable,
@@ -84,11 +85,16 @@ export function TableCard({
     setDragOverTable(false);
 
     const guestId = readDraggedGuest(event.dataTransfer);
-    const emptySeat = firstEmptySeat(table);
 
-    if (guestId && emptySeat !== null) {
-      onAssign(guestId, table.id, emptySeat);
+    if (!guestId) {
+      return;
     }
+
+    const size = partySizeOf(guestById.get(guestId));
+    const start = findPartyStart(table, size, 0, guestId);
+    // When the party does not fit, still route through onAssign so the planner
+    // can explain why instead of silently ignoring the drop.
+    onAssign(guestId, table.id, start ?? 0);
   };
 
   return (
@@ -120,6 +126,9 @@ export function TableCard({
         {Array.from({ length: table.seats }, (_, index) => {
           const guestId = table.guests[index] ?? null;
           const guest = guestId ? guestById.get(guestId) : undefined;
+          const previous = table.guests[(index - 1 + table.seats) % table.seats];
+          const isPartyStart = Boolean(guestId) && previous !== guestId;
+          const size = partySizeOf(guest);
           const selected = Boolean(guestId && guestId === selectedGuestId);
           const dragging = dragOverSeat === index;
           const angle = (index / table.seats) * 2 * Math.PI - Math.PI / 2;
@@ -142,12 +151,12 @@ export function TableCard({
               onDrop={(event) => handleSeatDrop(event, index)}
               title={
                 guest
-                  ? `${guest.name} · Table ${table.number}, seat ${index + 1}`
+                  ? `${guest.name} · ${size} ${size === 1 ? "person" : "people"} · Table ${table.number}, seat ${index + 1}`
                   : `Empty seat ${index + 1} at table ${table.number}`
               }
               aria-label={
                 guest
-                  ? `${guest.name}, table ${table.number}, seat ${index + 1}. Select to move or unseat.`
+                  ? `${guest.name}, ${size} ${size === 1 ? "person" : "people"}, table ${table.number}, seat ${index + 1}. Select to move or unseat.`
                   : `Empty seat ${index + 1} at table ${table.number}`
               }
               className={`absolute flex aspect-square -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border text-center transition-all duration-300 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold focus-visible:ring-offset-2 focus-visible:ring-offset-ivory ${
@@ -156,7 +165,9 @@ export function TableCard({
                   : guest
                     ? selected
                       ? "border-gold bg-gold text-white shadow-md shadow-gold/30"
-                      : "border-forest/20 bg-forest text-ivory shadow-sm hover:scale-105 hover:bg-forest-700"
+                      : isPartyStart
+                        ? "border-forest/20 bg-forest text-ivory shadow-sm hover:scale-105 hover:bg-forest-700"
+                        : "border-forest/10 bg-forest/75 text-ivory/90 hover:scale-105 hover:bg-forest"
                     : selectedGuestId
                       ? "border-gold/50 bg-cream/80 text-forest hover:scale-105 hover:border-gold hover:bg-cream"
                       : "border-dashed border-parchment bg-ivory/80 text-muted/70 hover:scale-105 hover:border-gold hover:bg-cream hover:text-forest"
@@ -168,9 +179,18 @@ export function TableCard({
               }}
             >
               {guest ? (
-                <span className="px-0.5 text-[8px] font-medium leading-[1.05] break-words sm:text-[9px]">
-                  {guestChairLabel(guest.name)}
-                </span>
+                isPartyStart ? (
+                  <span className="px-0.5 text-[8px] font-medium leading-[1.05] break-words sm:text-[9px]">
+                    {guestChairLabel(guest.name)}
+                  </span>
+                ) : (
+                  <span
+                    aria-hidden
+                    className="text-[9px] leading-none opacity-70"
+                  >
+                    •
+                  </span>
+                )
               ) : (
                 <span className="text-[8px] font-medium leading-none sm:text-[9px]">
                   {selectedGuestId ? "+" : index + 1}

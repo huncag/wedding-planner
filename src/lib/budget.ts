@@ -21,6 +21,13 @@ export type BudgetItem = {
   /** What was actually agreed or paid — optional until a vendor is booked. */
   actual?: Money;
   paid: boolean;
+  /** Vendor or payee name as written in the spreadsheet. */
+  vendorName?: string | null;
+  quantity?: number | null;
+  unitPrice?: number | null;
+  notes?: string | null;
+  paymentMethod?: string | null;
+  paymentReference?: string | null;
 };
 
 /** Shape of a `public.budget` row as returned by PostgREST. */
@@ -33,6 +40,12 @@ export type BudgetRow = {
   actual_cost: number | string | null;
   actual_currency: Currency | null;
   paid: boolean;
+  vendor_name?: string | null;
+  quantity?: number | string | null;
+  unit_price?: number | string | null;
+  notes?: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
 };
 
 /** PostgREST may serialise `numeric` as a string, so accept both. */
@@ -62,6 +75,12 @@ export function budgetItemFromRow(row: BudgetRow): BudgetItem {
       ? { actual: { amount: actual, currency: actualCurrency } }
       : {}),
     paid: row.paid,
+    vendorName: row.vendor_name ?? null,
+    quantity: numeric(row.quantity ?? null),
+    unitPrice: numeric(row.unit_price ?? null),
+    notes: row.notes ?? null,
+    paymentMethod: row.payment_method ?? null,
+    paymentReference: row.payment_reference ?? null,
   };
 }
 

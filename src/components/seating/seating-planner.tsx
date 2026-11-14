@@ -18,11 +18,12 @@ import {
   GUEST_DRAG_TYPE,
   MAX_SEATS,
   MIN_SEATS,
-  assignGuest,
   countSeated,
   guestInitials,
   isGuestDrag,
   nextTableNumber,
+  partySizeOf,
+  placeParty,
   readDraggedGuest,
   totalCapacity,
   unassignGuest,
@@ -65,45 +66,58 @@ export function SeatingPlanner({
   const [isDropTarget, setIsDropTarget] = useState(false);
   const [isAddingTable, setIsAddingTable] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(initialError);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const guestById = useMemo(
     () => new Map<string, Guest>(guests.map((guest) => [guest.id, guest])),
     [guests],
   );
-  const confirmedGuests = useMemo(
-    () => guests.filter((guest) => guest.rsvp === "yes"),
+
+  // Parties that said no are never seated; everyone else can be pre-planned,
+  // because most of the imported list is still awaiting a reply.
+  const placeableGuests = useMemo(
+    () => guests.filter((guest) => guest.rsvp !== "no"),
     [guests],
+  );
+  const placeablePeople = useMemo(
+    () =>
+      placeableGuests.reduce(
+        (total, guest) => total + partySizeOf(guest),
+        0,
+      ),
+    [placeableGuests],
   );
 
   const seatByGuest = useMemo(() => {
     const map = new Map<
       string,
-      { tableNumber: number; seatNumber: number }
+      { tableNumber: number; seatNumber: number; partySize: number }
     >();
 
     for (const table of tables) {
       table.guests.forEach((guestId, index) => {
-        if (guestId) {
+        if (guestId && !map.has(guestId)) {
           map.set(guestId, {
             tableNumber: table.number,
             seatNumber: index + 1,
+            partySize: partySizeOf(guestById.get(guestId)),
           });
         }
       });
     }
 
     return map;
-  }, [tables]);
+  }, [tables, guestById]);
 
-  const seatedCount = countSeated(tables);
+  const seatedPeople = countSeated(tables);
   const capacity = totalCapacity(tables);
-  const seatedConfirmed = confirmedGuests.filter((guest) =>
+  const seatedParties = placeableGuests.filter((guest) =>
     seatByGuest.has(guest.id),
   ).length;
   const progress =
-    confirmedGuests.length === 0
+    placeablePeople === 0
       ? 0
-      : Math.round((seatedConfirmed / confirmedGuests.length) * 100);
+      : Math.round((Math.min(seatedPeople, placeablePeople) / placeablePeople) * 100);
 
   const selectedGuest = selectedGuestId
     ? (guestById.get(selectedGuestId) ?? null)
@@ -111,14 +125,15 @@ export function SeatingPlanner({
 
   const normalizedQuery = query.trim().toLowerCase();
   const visibleGuests = normalizedQuery
-    ? confirmedGuests.filter((guest) =>
+    ? placeableGuests.filter((guest) =>
         guest.name.toLowerCase().includes(normalizedQuery),
       )
-    : confirmedGuests;
+    : placeableGuests;
 
   /**
-   * Writes only the guests whose chair changed. Chairs are cleared first so a
-   * swap never trips the unique (table_id, seat_index) index mid-update.
+   * Writes only the guests whose starting chair changed. Chairs are cleared
+   * first so a swap never trips the unique (table_id, seat_index) index
+   * mid-update.
    */
   const saveSeating = useCallback(
     async (
@@ -174,11 +189,8 @@ export function SeatingPlanner({
     [],
   );
 
-  const applyTables = useCallback(
-    async (mutate: (current: SeatingTable[]) => SeatingTable[]) => {
-      const previous = tables;
-      const next = mutate(previous);
-
+  const commitTables = useCallback(
+    async (previous: SeatingTable[], next: SeatingTable[]) => {
       if (next === previous) {
         return;
       }
@@ -200,25 +212,38 @@ export function SeatingPlanner({
         );
       }
     },
-    [tables, saveSeating],
+    [saveSeating],
   );
 
   const handleAssign = useCallback(
     (guestId: string, tableId: string, seatIndex: number) => {
-      void applyTables((current) =>
-        assignGuest(current, guestId, tableId, seatIndex),
-      );
+      const guest = guestById.get(guestId);
+      const size = partySizeOf(guest);
+      const table = tables.find((entry) => entry.id === tableId);
+      const result = placeParty(tables, guestId, tableId, seatIndex, size);
+
+      if (!result.placed) {
+        setNotice(
+          `${guest?.name ?? "That party"} needs ${size} free chairs together${
+            table ? ` and table ${table.number} has no run that size` : ""
+          }. Add a chair or pick another table.`,
+        );
+        return;
+      }
+
+      setNotice(null);
+      void commitTables(tables, result.tables);
       setSelectedGuestId(null);
     },
-    [applyTables],
+    [tables, guestById, commitTables],
   );
 
   const handleUnassign = useCallback(
     (guestId: string) => {
-      void applyTables((current) => unassignGuest(current, guestId));
+      void commitTables(tables, unassignGuest(tables, guestId));
       setSelectedGuestId((current) => (current === guestId ? null : current));
     },
-    [applyTables],
+    [tables, commitTables],
   );
 
   const handleSelectGuest = useCallback((guestId: string) => {
@@ -239,36 +264,38 @@ export function SeatingPlanner({
         return;
       }
 
-      const previous = tables;
-      const next = previous.map((entry) => {
-        if (entry.id !== tableId) {
-          return entry;
-        }
+      const keptChairs = table.guests.slice(0, nextSeats);
+      const displacedIds = new Set(
+        table.guests
+          .slice(nextSeats)
+          .filter((guestId): guestId is string => Boolean(guestId)),
+      );
+      // A party can straddle the new edge: if any of its chairs is cut off,
+      // the whole party is unseated and removed from the remaining chairs.
+      const kept = Array.from({ length: nextSeats }, (_, index) => {
+        const guestId = keptChairs[index] ?? null;
 
-        const chairs = entry.guests.slice(0, nextSeats);
-
-        while (chairs.length < nextSeats) {
-          chairs.push(null);
-        }
-
-        return { ...entry, seats: nextSeats, guests: chairs };
+        return guestId && !displacedIds.has(guestId) ? guestId : null;
       });
+
+      const previous = tables;
+      const next = previous.map((entry) =>
+        entry.id === tableId
+          ? { ...entry, seats: nextSeats, guests: kept }
+          : entry,
+      );
 
       setTables(next);
       setSaveError(null);
 
-      const displaced = table.guests
-        .slice(nextSeats)
-        .filter((guestId): guestId is string => Boolean(guestId));
-
       try {
         const supabase = createClient();
 
-        if (displaced.length > 0) {
+        if (displacedIds.size > 0) {
           const { error: unseatError } = await supabase
             .from("guests")
             .update({ seating_table_id: null, seat_index: null })
-            .in("id", displaced);
+            .in("id", [...displacedIds]);
 
           if (unseatError) {
             throw new Error(unseatError.message);
@@ -397,14 +424,30 @@ export function SeatingPlanner({
         </p>
       ) : null}
 
+      {notice ? (
+        <div
+          role="status"
+          className="flex items-start justify-between gap-3 rounded-xl border border-parchment bg-cream/60 px-4 py-3 text-sm text-forest"
+        >
+          <p>{notice}</p>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="text-[0.6rem] font-medium uppercase tracking-[0.16em] text-muted transition-colors hover:text-forest"
+          >
+            Dismiss
+          </button>
+        </div>
+      ) : null}
+
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="min-w-0 space-y-4">
           <section className="rounded-2xl border border-parchment/80 bg-white/70 p-5 shadow-sm">
             <div className="flex flex-wrap items-end justify-between gap-5">
               <div className="flex flex-wrap gap-x-8 gap-y-4">
                 <Stat label="Tables" value={tables.length} />
-                <Stat label="Seated" value={`${seatedCount}`} />
-                <Stat label="Free seats" value={capacity - seatedCount} />
+                <Stat label="Seated" value={`${seatedPeople} people`} />
+                <Stat label="Free seats" value={capacity - seatedPeople} />
               </div>
 
               <div className="w-full min-w-[12rem] flex-1 sm:max-w-xs">
@@ -419,8 +462,8 @@ export function SeatingPlanner({
                   />
                 </div>
                 <p className="mt-2 text-[0.65rem] text-muted">
-                  {seatedConfirmed} of {confirmedGuests.length} confirmed guests
-                  seated
+                  {seatedParties} of {placeableGuests.length} parties ·{" "}
+                  {seatedPeople} of {placeablePeople} people seated
                 </p>
               </div>
             </div>
@@ -441,9 +484,13 @@ export function SeatingPlanner({
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-forest">
                     Seating {selectedGuest.name}
+                    <span className="ml-2 font-normal text-muted">
+                      {partySizeOf(selectedGuest)}{" "}
+                      {partySizeOf(selectedGuest) === 1 ? "person" : "people"}
+                    </span>
                   </p>
                   <p className="text-[0.65rem] text-muted">
-                    Tap an empty chair, or drop the guest onto a table.
+                    Tap an empty chair, or drop the party onto a table.
                   </p>
                 </div>
                 <button
@@ -460,8 +507,9 @@ export function SeatingPlanner({
                   <GripIcon className="h-4 w-4" />
                 </span>
                 <p className="text-xs leading-relaxed text-muted">
-                  Drag a confirmed guest onto a chair, or select a guest and tap
-                  a seat. Drop a guest back on the list to unseat them.
+                  Drag an invitation group onto a chair, or select it and tap a
+                  seat. A group takes as many chairs as it has people. Drop it
+                  back on the list to unseat it.
                 </p>
               </>
             )}
@@ -514,19 +562,19 @@ export function SeatingPlanner({
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-[0.6rem] font-medium uppercase tracking-[0.24em] text-gold-ink">
-                RSVP confirmed
+                Invitation groups
               </p>
               <h2 className="mt-1 font-display text-2xl leading-none text-forest">
                 Guests
               </h2>
             </div>
             <span className="rounded-full border border-parchment bg-cream/70 px-3 py-1 text-xs font-medium text-forest">
-              {confirmedGuests.length}
+              {placeableGuests.length}
             </span>
           </div>
 
           <label className="relative mt-4 block">
-            <span className="sr-only">Search confirmed guests</span>
+            <span className="sr-only">Search invitation groups</span>
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
             <input
               type="search"
@@ -538,12 +586,13 @@ export function SeatingPlanner({
           </label>
 
           <ul
-            aria-label="Confirmed guests"
+            aria-label="Invitation groups"
             className="mt-3 min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1"
           >
             {visibleGuests.map((guest) => {
               const seat = seatByGuest.get(guest.id);
               const selected = guest.id === selectedGuestId;
+              const size = partySizeOf(guest);
 
               return (
                 <li key={guest.id}>
@@ -576,10 +625,22 @@ export function SeatingPlanner({
                       <span className="block truncate text-sm font-medium text-forest">
                         {guest.name}
                       </span>
-                      <span className="mt-0.5 block text-[0.65rem] text-muted">
-                        {seat
-                          ? `Table ${seat.tableNumber} · Seat ${seat.seatNumber}`
-                          : "Not seated"}
+                      <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[0.65rem] text-muted">
+                        <span>
+                          {size} {size === 1 ? "person" : "people"}
+                        </span>
+                        <span aria-hidden>·</span>
+                        <span>
+                          {seat
+                            ? `Table ${seat.tableNumber} · seat ${seat.seatNumber}`
+                            : "Not seated"}
+                        </span>
+                        {guest.rsvp === "pending" ? (
+                          <>
+                            <span aria-hidden>·</span>
+                            <span className="text-gold-ink">Awaiting reply</span>
+                          </>
+                        ) : null}
                       </span>
                     </span>
                     {seat ? (
@@ -596,20 +657,20 @@ export function SeatingPlanner({
 
             {visibleGuests.length === 0 ? (
               <li className="rounded-xl border border-dashed border-parchment px-4 py-8 text-center text-xs leading-relaxed text-muted">
-                {confirmedGuests.length === 0
-                  ? "No confirmed guests yet. Guests who reply “attending” appear here automatically."
-                  : `No confirmed guests match “${query.trim()}”.`}
+                {placeableGuests.length === 0
+                  ? "No guests yet. Add invitation groups on the Guests page or let the RSVP form bring them in."
+                  : `No guests match “${query.trim()}”.`}
               </li>
             ) : null}
           </ul>
 
           <p className="mt-3 rounded-xl border border-dashed border-parchment bg-ivory/60 px-3 py-2 text-center text-[0.65rem] leading-relaxed text-muted">
-            Drag a guest here to unseat them
+            Drag a group here to unseat it
           </p>
 
           <p className="mt-3 text-[0.65rem] leading-relaxed text-muted">
-            Every change is saved for both of you. Guests arrive from the public
-            RSVP form, so seating stays in step with the replies.
+            Every change is saved for both of you. Pending groups are shown so
+            you can plan ahead; groups that declined are hidden.
           </p>
         </aside>
       </div>

@@ -22,6 +22,7 @@ type Confirmation = {
   name: string;
   attending: boolean;
   meal: MealPreference | null;
+  partySize: number;
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -31,6 +32,7 @@ export function RsvpForm() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [attendance, setAttendance] = useState<Attendance>("");
+  const [partySize, setPartySize] = useState(1);
   const [meal, setMeal] = useState<MealPreference | "">("");
   const [plusOne, setPlusOne] = useState("");
   const [dietary, setDietary] = useState("");
@@ -45,6 +47,7 @@ export function RsvpForm() {
     setEmail("");
     setPhone("");
     setAttendance("");
+    setPartySize(1);
     setMeal("");
     setPlusOne("");
     setDietary("");
@@ -64,6 +67,7 @@ export function RsvpForm() {
         name: name.trim() || "friend",
         attending: attendance === "yes",
         meal: meal || null,
+        partySize,
       });
       return;
     }
@@ -97,6 +101,11 @@ export function RsvpForm() {
 
     const attending = attendance === "yes";
 
+    if (attending && (!Number.isInteger(partySize) || partySize < 1)) {
+      setError("Tell us how many people are coming, including yourself.");
+      return;
+    }
+
     if (attending && !meal) {
       setError("Please choose a meal so we can plan the menu.");
       return;
@@ -113,6 +122,7 @@ export function RsvpForm() {
           email: trimmedEmail || null,
           phone: trimmedPhone || null,
           attending,
+          party_size: attending ? Math.min(20, Math.round(partySize)) : 1,
           meal_preference: attending && meal ? meal : null,
           dietary_restrictions: attending && trimmedDietary ? trimmedDietary : null,
           plus_one_name: attending && trimmedPlusOne ? trimmedPlusOne : null,
@@ -131,6 +141,7 @@ export function RsvpForm() {
         name: trimmedName,
         attending,
         meal: attending && meal ? meal : null,
+        partySize: attending ? Math.min(20, Math.round(partySize)) : 1,
       });
       setPending(false);
     } catch {
@@ -169,6 +180,12 @@ export function RsvpForm() {
                 </span>
               </p>
             ) : null}
+            <p className="mt-1 text-sm text-muted">
+              Party of{" "}
+              <span className="font-medium text-forest">
+                {confirmation.partySize}
+              </span>
+            </p>
           </>
         ) : (
           <p className="mt-3 text-sm leading-relaxed text-forest/80">
@@ -310,7 +327,7 @@ export function RsvpForm() {
 
       {attending ? (
         <div className="space-y-6 rounded-2xl border border-parchment/80 bg-cream/30 p-4 sm:p-5">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="rsvp-meal" className={labelClass}>
                 Meal preference
@@ -335,6 +352,28 @@ export function RsvpForm() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label htmlFor="rsvp-party-size" className={labelClass}>
+                People coming
+              </label>
+              <input
+                id="rsvp-party-size"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                max="20"
+                step="1"
+                value={partySize}
+                onChange={(event) => {
+                  setPartySize(Number(event.target.value));
+                  setError(null);
+                }}
+                className={inputClass}
+              />
+              <p className="mt-1 text-[0.65rem] text-muted">
+                Include yourself in the count.
+              </p>
             </div>
             <div>
               <label htmlFor="rsvp-plus-one" className={labelClass}>

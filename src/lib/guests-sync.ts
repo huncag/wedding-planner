@@ -9,6 +9,7 @@ type SubmissionRow = {
   email: string | null;
   phone: string | null;
   attending: boolean;
+  party_size: number | null;
   meal_preference: MealPreference | null;
   dietary_restrictions: string | null;
   plus_one_name: string | null;
@@ -19,10 +20,13 @@ type GuestLookupRow = {
   id: string;
   name: string;
   email: string | null;
+  party_size: number | null;
 };
 
 function normalize(value: string | null | undefined): string {
-  return value?.trim().toLowerCase() ?? "";
+  return (value?.trim().toLowerCase() ?? "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "");
 }
 
 /**
@@ -36,9 +40,7 @@ function normalize(value: string | null | undefined): string {
 export async function syncRsvpGuests(supabase: Db): Promise<void> {
   const { data: submissions, error } = await supabase
     .from("rsvp_submissions")
-    .select(
-      "id, name, email, phone, attending, meal_preference, dietary_restrictions, plus_one_name, guest_id",
-    )
+    .select("*")
     .order("submitted_at", { ascending: true });
 
   if (error || !submissions?.length) {
@@ -47,7 +49,7 @@ export async function syncRsvpGuests(supabase: Db): Promise<void> {
 
   const { data: guests, error: guestsError } = await supabase
     .from("guests")
-    .select("id, name, email");
+    .select("*");
 
   if (guestsError) {
     return;
@@ -55,6 +57,7 @@ export async function syncRsvpGuests(supabase: Db): Promise<void> {
 
   const byEmail = new Map<string, string>();
   const byName = new Map<string, string>();
+  const sizeById = new Map<string, number>();
 
   for (const guest of (guests ?? []) as GuestLookupRow[]) {
     if (guest.email) {
@@ -62,11 +65,20 @@ export async function syncRsvpGuests(supabase: Db): Promise<void> {
     }
 
     byName.set(normalize(guest.name), guest.id);
+    sizeById.set(
+      guest.id,
+      Number.isFinite(Number(guest.party_size)) && Number(guest.party_size) > 0
+        ? Math.round(Number(guest.party_size))
+        : 1,
+    );
   }
 
   for (const submission of submissions as SubmissionRow[]) {
+    const size = Math.max(1, Math.round(Number(submission.party_size ?? 1)));
+
     const payload = {
       rsvp_status: submission.attending ? "attending" : "declined",
+      confirmed_count: submission.attending ? size : 0,
       meal_preference: submission.meal_preference,
       dietary_restrictions: submission.dietary_restrictions,
       plus_one_name: submission.plus_one_name,
@@ -78,7 +90,15 @@ export async function syncRsvpGuests(supabase: Db): Promise<void> {
       byName.get(normalize(submission.name));
 
     if (existing) {
-      await supabase.from("guests").update(payload).eq("id", existing);
+      const currentSize = sizeById.get(existing) ?? 1;
+
+      await supabase
+        .from("guests")
+        .update({
+          ...payload,
+          party_size: Math.max(currentSize, size),
+        })
+        .eq("id", existing);
 
       if (submission.guest_id !== existing) {
         await supabase
@@ -96,6 +116,7 @@ export async function syncRsvpGuests(supabase: Db): Promise<void> {
         name: submission.name,
         email: submission.email,
         phone: submission.phone,
+        party_size: size,
         ...payload,
       })
       .select("id")

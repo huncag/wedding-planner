@@ -173,6 +173,13 @@ function ReplyCard({
       {submission.attending ? (
         <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-parchment/60 pt-3 text-sm sm:grid-cols-2">
           <div className="flex gap-2">
+            <dt className="text-muted">Party</dt>
+            <dd className="font-medium text-forest">
+              {Math.max(1, submission.party_size ?? 1)}{" "}
+              {(submission.party_size ?? 1) === 1 ? "person" : "people"}
+            </dd>
+          </div>
+          <div className="flex gap-2">
             <dt className="text-muted">Meal</dt>
             <dd className="font-medium text-forest">{meal ?? "Not chosen"}</dd>
           </div>
@@ -559,7 +566,7 @@ export function GuestsBoard({
       ) : null}
 
       <section aria-label="RSVP summary">
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <StatCard
             label="Replies"
             value={summary.replies}
@@ -569,6 +576,11 @@ export function GuestsBoard({
             label="Attending"
             value={summary.attending}
             note="Joyfully accepted"
+          />
+          <StatCard
+            label="People"
+            value={summary.people}
+            note="Coming in total"
           />
           <StatCard
             label="Declined"

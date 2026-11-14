@@ -26,7 +26,8 @@ export default async function SeatingPage() {
       .order("table_number", { ascending: true }),
     supabase
       .from("guests")
-      .select("id, name, rsvp_status, seating_table_id, seat_index"),
+      .select("*")
+      .order("name", { ascending: true }),
   ]);
 
   const tableRows = (tablesResult.data ?? []) as SeatingTableRow[];

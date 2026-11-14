@@ -1,3 +1,9 @@
+import {
+  CATEGORY_OPTIONS,
+  SIDE_OPTIONS,
+  type GuestCategory,
+  type GuestSide,
+} from "@/lib/guests";
 import type { Guest, RsvpStatus, SeatingTable } from "@/lib/seating";
 
 /** Minimal shape of a `public.seating_tables` row. */
@@ -11,6 +17,9 @@ export type SeatingTableRow = {
 export type GuestRow = {
   id: string;
   name: string;
+  party_size: number | string | null;
+  side: string | null;
+  category: string | null;
   rsvp_status: "pending" | "attending" | "declined";
   seating_table_id: string | null;
   seat_index: number | null;
@@ -28,19 +37,38 @@ export function rsvpFromDb(status: GuestRow["rsvp_status"]): RsvpStatus {
   return "pending";
 }
 
+function partySize(value: number | string | null): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : 1;
+}
+
+function groupLabel(side: string | null, category: string | null): string {
+  const sideLabel =
+    SIDE_OPTIONS.find((option) => option.id === (side as GuestSide))?.short ??
+    "Shared";
+  const categoryLabel =
+    CATEGORY_OPTIONS.find((option) => option.id === (category as GuestCategory))
+      ?.label ?? "Friends";
+
+  return `${sideLabel} · ${categoryLabel}`;
+}
+
 export function guestFromRow(row: GuestRow): Guest {
   return {
     id: row.id,
     name: row.name,
-    group: "Guests",
+    group: groupLabel(row.side, row.category),
     rsvp: rsvpFromDb(row.rsvp_status),
+    partySize: partySize(row.party_size),
   };
 }
 
 /**
  * Turns table rows plus their guest rows into the seat arrays the planner
- * renders. Guests whose stored seat no longer fits the table are left out; the
- * next capacity change will not overwrite their row.
+ * renders. A party fills `party_size` consecutive chairs from its stored
+ * starting chair. Parties that no longer fit are left unseated on screen; the
+ * next seating change writes the corrected position.
  */
 export function buildSeatingTables(
   tables: readonly SeatingTableRow[],
@@ -56,16 +84,33 @@ export function buildSeatingTables(
       );
 
       for (const guest of guests) {
-        const index = guest.seat_index;
+        const start = guest.seat_index;
+        const size = partySize(guest.party_size);
 
         if (
-          guest.seating_table_id === table.id &&
-          index !== null &&
-          index >= 0 &&
-          index < capacity &&
-          seats[index] === null
+          guest.seating_table_id !== table.id ||
+          start === null ||
+          start < 0 ||
+          start >= capacity ||
+          size > capacity
         ) {
-          seats[index] = guest.id;
+          continue;
+        }
+
+        let free = true;
+        for (let offset = 0; offset < size; offset += 1) {
+          if (seats[(start + offset) % capacity] !== null) {
+            free = false;
+            break;
+          }
+        }
+
+        if (!free) {
+          continue;
+        }
+
+        for (let offset = 0; offset < size; offset += 1) {
+          seats[(start + offset) % capacity] = guest.id;
         }
       }
 
@@ -83,26 +128,52 @@ export type SeatAssignment = {
   seatIndex: number;
 };
 
-/** Guest id → the chair they currently occupy. */
+/**
+ * Guest id → the first chair of their run. A party can wrap past the last
+ * chair, so the run start is the chair whose predecessor is not the same party
+ * — not simply the lowest index it occupies.
+ */
 export function seatAssignments(
   tables: readonly SeatingTable[],
 ): Map<string, SeatAssignment> {
   const assignments = new Map<string, SeatAssignment>();
 
   for (const table of tables) {
-    table.guests.forEach((guestId, index) => {
-      if (guestId) {
+    const seats = table.guests.slice(0, table.seats);
+    const firstSeen = new Map<string, number>();
+
+    seats.forEach((guestId, index) => {
+      if (guestId && !firstSeen.has(guestId)) {
+        firstSeen.set(guestId, index);
+      }
+    });
+
+    seats.forEach((guestId, index) => {
+      if (!guestId || assignments.has(guestId)) {
+        return;
+      }
+
+      const previous = seats[(index - 1 + seats.length) % seats.length];
+
+      if (previous !== guestId) {
         assignments.set(guestId, { tableId: table.id, seatIndex: index });
       }
     });
+
+    // A party that fills every chair has no run start; fall back to its first.
+    for (const [guestId, index] of firstSeen) {
+      if (!assignments.has(guestId)) {
+        assignments.set(guestId, { tableId: table.id, seatIndex: index });
+      }
+    }
   }
 
   return assignments;
 }
 
 /**
- * Guest ids whose chair differs between two plans. Used to keep database writes
- * small — only moved guests are updated.
+ * Guest ids whose starting chair differs between two plans. Used to keep
+ * database writes small — only moved parties are updated.
  */
 export function changedSeats(
   previous: readonly SeatingTable[],
