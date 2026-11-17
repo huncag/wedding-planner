@@ -121,7 +121,9 @@ same plan.
 - **Vendors** — grouped by category, with contact, handled-by, offer summary,
   free-text price note, agreement and status, all saved as you toggle.
 - **Overview** — the four cards are live totals of people invited, people coming,
-  booked vendors and the estimated budget in the display currency.
+  booked vendors and the estimated budget in the display currency. The next-steps
+  checklist tracks the same data: unanswered groups, open vendors, missing meal
+  choices and invitation progress all update automatically.
 
 ## Hosting
 

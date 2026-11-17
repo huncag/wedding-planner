@@ -21,12 +21,11 @@ import { syncRsvpGuests } from "@/lib/guests-sync";
 import { createClient } from "@/lib/supabase/server";
 import { WEDDING } from "@/lib/wedding";
 
-const NEXT_STEPS = [
-  "Confirm the guest list",
-  "Book the remaining vendors",
-  "Finalize the menu and dietary options",
-  "Design and send the invitations",
-] as const;
+type NextStep = {
+  label: string;
+  detail: string;
+  done: boolean;
+};
 
 export default async function OverviewPage() {
   const supabase = await createClient();
@@ -49,6 +48,9 @@ export default async function OverviewPage() {
     rsvp_status: "pending" | "attending" | "declined";
     party_size: number | string | null;
     confirmed_count: number | string | null;
+    invite_sent: boolean | null;
+    meal_preference: string | null;
+    dietary_restrictions: string | null;
   }[];
   const parties = guestRows.length;
   const invitedPeople = guestRows.reduce((total, guest) => {
@@ -74,6 +76,16 @@ export default async function OverviewPage() {
   const declinedParties = guestRows.filter(
     (guest) => guest.rsvp_status === "declined",
   ).length;
+  const invitesSent = guestRows.filter((guest) => guest.invite_sent).length;
+  const attendingGroups = guestRows.filter(
+    (guest) => guest.rsvp_status === "attending",
+  );
+  const mealsMissing = attendingGroups.filter(
+    (guest) => !guest.meal_preference,
+  ).length;
+  const dietaryNotes = guestRows.filter((guest) =>
+    (guest.dietary_restrictions ?? "").trim(),
+  ).length;
 
   const vendorStatuses = (vendorsResult.data ?? []) as {
     status: string;
@@ -85,6 +97,7 @@ export default async function OverviewPage() {
   const vendorsAgreed = vendorStatuses.filter(
     (vendor) => vendor.agreed,
   ).length;
+  const vendorsOpen = vendorStatuses.length - vendorsBooked;
 
   const budgetRows = (budgetResult.data ?? []) as {
     estimated_cost: number | string;
@@ -136,6 +149,49 @@ export default async function OverviewPage() {
       Icon: BudgetIcon,
     },
   ] as const;
+
+  const nextSteps: NextStep[] = [
+    {
+      label: "Confirm the guest list",
+      detail:
+        parties === 0
+          ? "No invitation groups yet"
+          : pendingParties === 0
+            ? "Every group has replied"
+            : `${pendingParties} of ${parties} groups still to reply`,
+      done: parties > 0 && pendingParties === 0,
+    },
+    {
+      label: "Book the remaining vendors",
+      detail:
+        vendorStatuses.length === 0
+          ? "No vendors yet"
+          : vendorsOpen === 0
+            ? "Every vendor is booked"
+            : `${vendorsOpen} of ${vendorStatuses.length} still open`,
+      done: vendorStatuses.length > 0 && vendorsOpen === 0,
+    },
+    {
+      label: "Finalize the menu and dietary options",
+      detail:
+        attendingGroups.length === 0
+          ? dietaryNotes > 0
+            ? `${dietaryNotes} dietary ${dietaryNotes === 1 ? "note" : "notes"} to review`
+            : "Waiting for the first replies"
+          : `${mealsMissing} of ${attendingGroups.length} meal choices missing · ${dietaryNotes} dietary ${
+              dietaryNotes === 1 ? "note" : "notes"
+            }`,
+      done: attendingGroups.length > 0 && mealsMissing === 0,
+    },
+    {
+      label: "Design and send the invitations",
+      detail:
+        parties === 0
+          ? "No invitation groups yet"
+          : `${invitesSent} of ${parties} groups sent`,
+      done: parties > 0 && invitesSent === parties,
+    },
+  ];
 
   return (
     <div className="space-y-8">
@@ -200,18 +256,35 @@ export default async function OverviewPage() {
             </span>
           </div>
           <ul className="mt-5 divide-y divide-parchment/70">
-            {NEXT_STEPS.map((step, index) => (
-              <li key={step} className="flex items-center gap-4 py-3.5">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-parchment bg-ivory font-display text-sm text-forest/60">
-                  {index + 1}
+            {nextSteps.map((step, index) => (
+              <li key={step.label} className="flex items-start gap-4 py-3.5">
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border font-display text-sm ${
+                    step.done
+                      ? "border-forest/25 bg-forest/10 text-forest"
+                      : "border-parchment bg-ivory text-forest/60"
+                  }`}
+                >
+                  {step.done ? <CheckIcon className="h-4 w-4" /> : index + 1}
                 </span>
-                <span className="text-sm text-forest/85">{step}</span>
+                <span className="min-w-0">
+                  <span
+                    className={`block text-sm ${
+                      step.done ? "text-muted line-through" : "text-forest/85"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  <span className="mt-0.5 block text-[0.7rem] text-muted">
+                    {step.detail}
+                  </span>
+                </span>
               </li>
             ))}
           </ul>
           <p className="mt-4 text-xs text-muted">
-            A starting checklist — it will become editable once the planner is
-            wired up.
+            Live progress — each step updates as replies, bookings and
+            invitations come in.
           </p>
         </section>
 
