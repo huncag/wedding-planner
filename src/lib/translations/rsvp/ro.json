@@ -1,0 +1,68 @@
+{
+  "languageLabel": "Limbă",
+  "venueLine": "Castelul Teleki · Gernyeszeg",
+  "saveTheDate": "Rezervă data",
+  "longDate": "sâmbătă, 27 mai 2028",
+  "ceremonyLine": "Cununia la ora 15:00 · Gernyeszeg, România",
+  "kindlyReply": "Te rugăm să răspunzi",
+  "willYouJoin": "Vii cu noi?",
+  "intro": "Te rugăm să trimiți răspunsul cât mai curând — ne ajută să planificăm meniul, așezarea în sală și fiecare detaliu. Răspunsurile apar imediat în planificatorul nostru.",
+  "footer": "Abia așteptăm să sărbătorim împreună cu voi",
+  "form": {
+    "nameLabel": "Numele tău",
+    "namePlaceholder": "Prenume și nume",
+    "contactLegend": "Cum te putem contacta?",
+    "contactHint": "Dă-ne cel puțin unul dintre ele, ca să putem confirma detaliile.",
+    "emailLabel": "E-mail",
+    "phoneLabel": "Telefon",
+    "attendanceLegend": "Vii la nuntă?",
+    "acceptTitle": "Accept cu bucurie",
+    "acceptNote": "sâmbătă, 27 mai 2028 · 15:00",
+    "declineTitle": "Nu pot veni, din păcate",
+    "declineNote": "Ne va fi dor de tine, dar mulțumim că ne-ai anunțat.",
+    "peopleLegend": "Cine vine?",
+    "peopleHint": "Adaugă fiecare persoană care vine cu tine, apoi alege meniul pentru fiecare.",
+    "personNameLabel": "Nume",
+    "personNamePlaceholder": "Nume complet",
+    "mealLabel": "Meniul",
+    "mealPlaceholder": "Alege un meniu…",
+    "addPerson": "Adaugă o altă persoană",
+    "removePerson": "Elimină persoana",
+    "dietaryLabel": "Cerințe alimentare sau alergii (opțional)",
+    "dietaryPlaceholder": "de ex. alergie la nuci, fără gluten",
+    "messageLabel": "Un mesaj pentru noi (opțional)",
+    "messagePlaceholder": "Orice ai vrea să știm",
+    "submit": "Trimite răspunsul",
+    "submitting": "Se trimite…",
+    "privacy": "Datele tale sunt vizibile doar pentru noi doi.",
+    "errors": {
+      "nameRequired": "Te rugăm să ne spui numele tău.",
+      "contactRequired": "Adaugă o adresă de e-mail sau un număr de telefon ca să te putem contacta.",
+      "invalidEmail": "Această adresă de e-mail nu pare corectă.",
+      "attendanceRequired": "Te rugăm să ne spui dacă poți veni.",
+      "personNameRequired": "Te rugăm să adaugi numele fiecărei persoane care vine.",
+      "mealRequired": "Te rugăm să alegi meniul pentru fiecare persoană.",
+      "saveFailed": "Nu am putut salva răspunsul. Încearcă din nou în câteva momente sau scrie-ne direct.",
+      "networkFailed": "Serviciul de răspuns nu este disponibil. Verifică conexiunea și încearcă din nou."
+    }
+  },
+  "success": {
+    "thankYou": "Mulțumim, {name}!",
+    "attendingBody": "Răspunsul tău a ajuns la noi. Abia așteptăm să sărbătorim cu tine la {venue} în {date}.",
+    "partyHeading": "Cine vine",
+    "partySize": {
+      "one": "{count} persoană",
+      "few": "{count} persoane",
+      "other": "{count} de persoane"
+    },
+    "declinedBody": "Ne pare rău că nu poți veni, dar mulțumim că ne-ai anunțat. Ne va fi dor de tine.",
+    "next": "Ți s-a schimbat planul? Trimite un alt răspuns sau scrie-ne direct și îți actualizăm locul.",
+    "sendAnother": "Trimite un alt răspuns"
+  },
+  "meals": {
+    "meat": "Carne",
+    "vegetarian": "Vegetarian",
+    "vegan": "Vegan",
+    "kids": "Meniul copiilor"
+  }
+}

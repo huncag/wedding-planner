@@ -1,0 +1,67 @@
+{
+  "languageLabel": "Language",
+  "venueLine": "Teleki Castle · Gernyeszeg",
+  "saveTheDate": "Save the date",
+  "longDate": "Saturday, 27 May 2028",
+  "ceremonyLine": "Ceremony at 15:00 · Gernyeszeg, Romania",
+  "kindlyReply": "Kindly reply",
+  "willYouJoin": "Will you join us?",
+  "intro": "Please send your reply as soon as you know — it helps us plan the menu, seating and every last detail. Replies appear in our planner the moment they are sent.",
+  "footer": "We cannot wait to celebrate with you",
+  "form": {
+    "nameLabel": "Your name",
+    "namePlaceholder": "First and last name",
+    "contactLegend": "How can we reach you?",
+    "contactHint": "Give us at least one of the two so we can confirm the details.",
+    "emailLabel": "Email",
+    "phoneLabel": "Phone",
+    "attendanceLegend": "Will you join us?",
+    "acceptTitle": "Joyfully accepts",
+    "acceptNote": "Saturday, 27 May 2028 · 15:00",
+    "declineTitle": "Regretfully declines",
+    "declineNote": "We will miss you, but thank you for telling us.",
+    "peopleLegend": "Who is coming?",
+    "peopleHint": "Add everyone who is coming with you, then pick a meal for each person.",
+    "personNameLabel": "Name",
+    "personNamePlaceholder": "Full name",
+    "mealLabel": "Meal",
+    "mealPlaceholder": "Choose a meal…",
+    "addPerson": "Add another person",
+    "removePerson": "Remove person",
+    "dietaryLabel": "Dietary needs or allergies (optional)",
+    "dietaryPlaceholder": "e.g. nut allergy, gluten free",
+    "messageLabel": "A note for us (optional)",
+    "messagePlaceholder": "Anything you would like us to know",
+    "submit": "Send my reply",
+    "submitting": "Sending your reply…",
+    "privacy": "Your details are only visible to the two of us.",
+    "errors": {
+      "nameRequired": "Please tell us your name.",
+      "contactRequired": "Add an email address or a phone number so we can reach you.",
+      "invalidEmail": "That email address does not look right.",
+      "attendanceRequired": "Please let us know whether you can join us.",
+      "personNameRequired": "Please give a name for everyone who is coming.",
+      "mealRequired": "Please choose a meal for every person.",
+      "saveFailed": "We could not save your reply. Please try again in a moment, or send us a message directly.",
+      "networkFailed": "We could not reach the RSVP service. Check your connection and try again."
+    }
+  },
+  "success": {
+    "thankYou": "Thank you, {name}!",
+    "attendingBody": "Your reply is with us. We cannot wait to celebrate with you at {venue} on {date}.",
+    "partyHeading": "Who is coming",
+    "partySize": {
+      "one": "{count} person",
+      "other": "{count} people"
+    },
+    "declinedBody": "We are sorry you cannot make it, but thank you for letting us know. You will be missed.",
+    "next": "Plans changed? Send another reply or get in touch with us directly and we will update your place.",
+    "sendAnother": "Send another reply"
+  },
+  "meals": {
+    "meat": "Meat",
+    "vegetarian": "Vegetarian",
+    "vegan": "Vegan",
+    "kids": "Children's menu"
+  }
+}

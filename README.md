@@ -92,6 +92,11 @@ plus dietary needs and a message. It is available in English, Hungarian and
 Romanian, remembered in a cookie. Anonymous visitors can only insert a reply and
 can never read anyone else's.
 
+All page copy lives in [`src/lib/translations/rsvp`](src/lib/translations/rsvp):
+`en.json` is the source, `hu.json` and `ro.json` hold the translations. Missing
+or blank values fall back to English, and placeholders such as `{name}` and
+`{count}` must stay intact. See the README in that folder when editing wording.
+
 The per-person list lives in `rsvp_submissions.people`. If that column has not
 been added yet, replies still carry the full list inside `plus_one_name` and the
 planner decodes it — run [`supabase/rsvp-people.sql`](../supabase/rsvp-people.sql)

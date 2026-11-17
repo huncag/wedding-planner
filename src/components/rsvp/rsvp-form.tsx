@@ -9,7 +9,7 @@ import {
   type MealPreference,
   type RsvpPerson,
 } from "@/lib/rsvp";
-import { rsvpCopy, fill, type Language } from "@/lib/i18n";
+import { rsvpCopy, fill, pluralize, type Language } from "@/lib/i18n";
 import { WEDDING } from "@/lib/wedding";
 
 const inputClass =
@@ -274,12 +274,7 @@ export function RsvpForm({ language }: { language: Language }) {
                   {copy.success.partyHeading}
                 </p>
                 <p className="text-xs text-muted">
-                  {fill(
-                    partySize === 1
-                      ? copy.success.partySizeOne
-                      : copy.success.partySizeOther,
-                    { count: partySize },
-                  )}
+                  {pluralize(copy.success.partySize, partySize, language)}
                 </p>
               </div>
               <ul className="mt-2 divide-y divide-parchment/60">
