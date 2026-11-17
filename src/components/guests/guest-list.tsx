@@ -522,6 +522,10 @@ export function GuestList({
                             const pending = pendingIds.has(party.id);
                             const confirmed =
                               party.confirmedCount ?? attendingPeople(party);
+                            const showsConfirmed =
+                              party.confirmedCount !== null &&
+                              (party.confirmedCount > 0 ||
+                                party.rsvpStatus !== "pending");
 
                             return (
                               <li
@@ -539,7 +543,7 @@ export function GuestList({
                                         ? "person"
                                         : "people"}
                                     </span>
-                                    {party.confirmedCount !== null ? (
+                                    {showsConfirmed ? (
                                       <>
                                         <span aria-hidden>·</span>
                                         <span>
