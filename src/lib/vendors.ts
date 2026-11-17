@@ -161,17 +161,26 @@ export type VendorStats = {
   agreed: number;
   offersRequested: number;
   categories: number;
+  cancelled: number;
 };
 
+/** Cancelled vendors stay on the board but are left out of every total. */
+export function isCancelledVendor(vendor: Pick<Vendor, "status">): boolean {
+  return vendor.status === "cancelled";
+}
+
 export function summarizeVendors(vendors: readonly Vendor[]): VendorStats {
+  const active = vendors.filter((vendor) => !isCancelledVendor(vendor));
+
   return {
-    total: vendors.length,
-    booked: vendors.filter(
+    total: active.length,
+    booked: active.filter(
       (vendor) => vendor.status === "booked" || vendor.status === "completed",
     ).length,
-    agreed: vendors.filter((vendor) => vendor.agreed).length,
-    offersRequested: vendors.filter((vendor) => vendor.offerRequested).length,
-    categories: new Set(vendors.map((vendor) => vendor.category)).size,
+    agreed: active.filter((vendor) => vendor.agreed).length,
+    offersRequested: active.filter((vendor) => vendor.offerRequested).length,
+    categories: new Set(active.map((vendor) => vendor.category)).size,
+    cancelled: vendors.length - active.length,
   };
 }
 

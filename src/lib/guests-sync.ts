@@ -1,5 +1,10 @@
 import type { createClient } from "@/lib/supabase/server";
-import type { MealPreference } from "@/lib/rsvp";
+import {
+  submissionPartySize,
+  submissionPeople,
+  type MealPreference,
+  type RsvpPerson,
+} from "@/lib/rsvp";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -13,6 +18,7 @@ type SubmissionRow = {
   meal_preference: MealPreference | null;
   dietary_restrictions: string | null;
   plus_one_name: string | null;
+  people: RsvpPerson[] | null;
   guest_id: string | null;
 };
 
@@ -74,14 +80,22 @@ export async function syncRsvpGuests(supabase: Db): Promise<void> {
   }
 
   for (const submission of submissions as SubmissionRow[]) {
-    const size = Math.max(1, Math.round(Number(submission.party_size ?? 1)));
+    const size = submissionPartySize(submission);
+    const people = submissionPeople(submission);
+    const plusOneName =
+      submission.attending && people.length > 1
+        ? people
+            .slice(1)
+            .map((person) => person.name)
+            .join(", ") || null
+        : null;
 
     const payload = {
       rsvp_status: submission.attending ? "attending" : "declined",
       confirmed_count: submission.attending ? size : 0,
-      meal_preference: submission.meal_preference,
+      meal_preference: people[0]?.meal ?? submission.meal_preference,
       dietary_restrictions: submission.dietary_restrictions,
-      plus_one_name: submission.plus_one_name,
+      plus_one_name: plusOneName,
     };
 
     const existing =

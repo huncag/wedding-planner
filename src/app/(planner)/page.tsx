@@ -87,10 +87,14 @@ export default async function OverviewPage() {
     (guest.dietary_restrictions ?? "").trim(),
   ).length;
 
-  const vendorStatuses = (vendorsResult.data ?? []) as {
+  const vendorRows = (vendorsResult.data ?? []) as {
     status: string;
     agreed: boolean | null;
   }[];
+  const vendorStatuses = vendorRows.filter(
+    (vendor) => vendor.status !== "cancelled",
+  );
+  const cancelledVendors = vendorRows.length - vendorStatuses.length;
   const vendorsBooked = vendorStatuses.filter(
     (vendor) => vendor.status === "booked" || vendor.status === "completed",
   ).length;
@@ -137,7 +141,9 @@ export default async function OverviewPage() {
       note:
         vendorStatuses.length === 0
           ? "No vendors yet"
-          : `${vendorsAgreed} agreed`,
+          : `${vendorsAgreed} agreed${
+              cancelledVendors > 0 ? ` · ${cancelledVendors} cancelled` : ""
+            }`,
       Icon: VendorsIcon,
     },
     {
@@ -168,7 +174,9 @@ export default async function OverviewPage() {
           ? "No vendors yet"
           : vendorsOpen === 0
             ? "Every vendor is booked"
-            : `${vendorsOpen} of ${vendorStatuses.length} still open`,
+            : `${vendorsOpen} of ${vendorStatuses.length} still open${
+                cancelledVendors > 0 ? ` · ${cancelledVendors} cancelled` : ""
+              }`,
       done: vendorStatuses.length > 0 && vendorsOpen === 0,
     },
     {

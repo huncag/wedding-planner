@@ -10,8 +10,11 @@ import {
   TrashIcon,
 } from "@/components/icons";
 import {
+  hasStructuredPeople,
   formatSubmittedAt,
   mealLabel,
+  submissionPartySize,
+  submissionPeople,
   summarizeRsvps,
   type RsvpSubmission,
 } from "@/lib/rsvp";
@@ -101,6 +104,9 @@ function ReplyCard({
 }) {
   const meal = mealLabel(submission.meal_preference);
   const tel = submission.phone?.replace(/[^\d+]/g, "");
+  const people = submissionPeople(submission);
+  const partySize = submissionPartySize(submission);
+  const structured = hasStructuredPeople(submission);
 
   return (
     <li
@@ -171,33 +177,61 @@ function ReplyCard({
       </div>
 
       {submission.attending ? (
-        <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-parchment/60 pt-3 text-sm sm:grid-cols-2">
-          <div className="flex gap-2">
-            <dt className="text-muted">Party</dt>
-            <dd className="font-medium text-forest">
-              {Math.max(1, submission.party_size ?? 1)}{" "}
-              {(submission.party_size ?? 1) === 1 ? "person" : "people"}
-            </dd>
+        <div className="mt-4 border-t border-parchment/60 pt-3 text-sm">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="flex gap-2">
+              <span className="text-muted">Party</span>
+              <span className="font-medium text-forest">
+                {partySize} {partySize === 1 ? "person" : "people"}
+              </span>
+            </div>
+            {!structured && meal ? (
+              <div className="flex gap-2">
+                <span className="text-muted">Meal</span>
+                <span className="font-medium text-forest">{meal}</span>
+              </div>
+            ) : null}
           </div>
-          <div className="flex gap-2">
-            <dt className="text-muted">Meal</dt>
-            <dd className="font-medium text-forest">{meal ?? "Not chosen"}</dd>
-          </div>
-          <div className="flex gap-2">
-            <dt className="text-muted">Plus-one</dt>
-            <dd className="min-w-0 break-words font-medium text-forest">
-              {submission.plus_one_name?.trim() || "None"}
-            </dd>
-          </div>
-          {submission.dietary_restrictions?.trim() ? (
-            <div className="flex gap-2 sm:col-span-2">
-              <dt className="shrink-0 text-muted">Dietary</dt>
-              <dd className="break-words text-forest/90">
-                {submission.dietary_restrictions}
-              </dd>
+
+          {structured ? (
+            <div className="mt-3">
+              <p className="text-[0.6rem] font-medium uppercase tracking-[0.18em] text-muted">
+                Who is coming
+              </p>
+              <ul className="mt-1.5 divide-y divide-parchment/50">
+                {people.map((person, index) => (
+                  <li
+                    key={`${person.name}-${index}`}
+                    className="flex items-baseline justify-between gap-3 py-1.5"
+                  >
+                    <span className="min-w-0 break-words font-medium text-forest">
+                      {person.name}
+                    </span>
+                    <span className="shrink-0 text-xs text-muted">
+                      {person.meal ? mealLabel(person.meal) : "Meal not chosen"}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : submission.plus_one_name?.trim() ? (
+            <div className="mt-2 flex gap-2">
+              <span className="text-muted">Plus-one</span>
+              <span className="min-w-0 break-words font-medium text-forest">
+                {submission.plus_one_name}
+              </span>
             </div>
           ) : null}
-        </dl>
+
+          {submission.dietary_restrictions?.trim() ? (
+            <div className="mt-2 flex gap-2">
+              <span className="shrink-0 text-muted">Dietary</span>
+              <span className="break-words text-forest/90">
+                {submission.dietary_restrictions}
+              </span>
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {submission.message?.trim() ? (

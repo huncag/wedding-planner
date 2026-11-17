@@ -335,6 +335,14 @@ export function VendorsBoard({
         <Stat label="Offers out" value={stats.offersRequested} />
       </section>
 
+      {stats.cancelled > 0 ? (
+        <p className="text-xs text-muted">
+          {stats.cancelled} cancelled{" "}
+          {stats.cancelled === 1 ? "vendor is" : "vendors are"} shown below but
+          left out of these totals.
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <label className="relative block w-full sm:max-w-xs">
           <span className="sr-only">Search vendors</span>

@@ -205,12 +205,15 @@ create table if not exists public.rsvp_submissions (
   meal_preference      public.meal_preference,
   dietary_restrictions text,
   plus_one_name        text,
+  people               jsonb,
   message              text,
   handled              boolean not null default false,
   submitted_at         timestamptz not null default now()
 );
 
 comment on table public.rsvp_submissions is 'Raw RSVP replies from the public page; the planner merges them into guests.';
+
+comment on column public.rsvp_submissions.people is 'Per-person list: [{"name": "...", "meal": "meat" | "vegetarian" | "vegan" | "kids"}].';
 
 create index if not exists rsvp_submissions_submitted_at_idx
   on public.rsvp_submissions (submitted_at desc);
@@ -262,7 +265,8 @@ alter table public.budget
   add column if not exists payment_reference text;
 
 alter table public.rsvp_submissions
-  add column if not exists party_size integer not null default 1;
+  add column if not exists party_size integer not null default 1,
+  add column if not exists people jsonb;
 
 -- ============================================================================
 -- Row Level Security

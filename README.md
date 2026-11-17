@@ -86,9 +86,16 @@ SQL editor and run it once after `schema.sql`.
 ## Public RSVP and live updates
 
 Guests open `/rsvp` without an account and submit their reply directly into
-`rsvp_submissions`. The form asks for contact details, attendance, party size,
-meal, dietary needs, a plus-one and a message; anonymous visitors can only insert
-a reply and can never read anyone else's.
+`rsvp_submissions`. The form asks for contact details and attendance, then lets
+the guest add as many people as they like with a name and meal for each one,
+plus dietary needs and a message. It is available in English, Hungarian and
+Romanian, remembered in a cookie. Anonymous visitors can only insert a reply and
+can never read anyone else's.
+
+The per-person list lives in `rsvp_submissions.people`. If that column has not
+been added yet, replies still carry the full list inside `plus_one_name` and the
+planner decodes it — run [`supabase/rsvp-people.sql`](../supabase/rsvp-people.sql)
+once to store it properly.
 
 `/guests` is the couple's guest list and inbox. The list stores one row per
 invitation group — headcount, side, category, invitation sent/reminder, reply and

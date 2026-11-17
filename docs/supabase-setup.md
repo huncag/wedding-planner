@@ -77,6 +77,11 @@ couple's existing plan:
 Every insert checks that its table is empty first, so running the file twice is
 safe. The original workbook is never modified.
 
+If your project was created before the per-person RSVP list, also run
+[`supabase/rsvp-people.sql`](../supabase/rsvp-people.sql). It adds the
+`rsvp_submissions.people` jsonb column, is safe to run more than once, and the
+app keeps working (with a compact fallback) until it has been applied.
+
 ## 6. Realtime
 
 The script adds `rsvp_submissions` and `guests` to the `supabase_realtime`
